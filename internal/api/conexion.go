@@ -8,7 +8,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -50,24 +49,16 @@ func mandarConexion(w http.ResponseWriter, r *http.Request, cluster Cluster, h *
 	ctx, cancelar := context.WithTimeout(r.Context(), esperaConexion)
 	defer cancelar()
 	res, pod, err := s.TCP(ctx, sondeo.PedidoTCP{Host: u.Hostname(), Puerto: int32(puerto)})
-	var sinRespuesta sondeo.SinRespuesta
-	if err != nil && !errors.As(err, &sinRespuesta) {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	intentada, motivo, falla := resultadoDelSondeo(err)
+	if falla != nil {
+		http.Error(w, falla.Error(), http.StatusServiceUnavailable)
 		return
 	}
 
 	f := cluster.Foto()
-	out := prueba{
-		ID:           h.nuevoID(),
-		Tipo:         p.Tipo,
-		URL:          u.String(),
-		Origen:       origen(pod),
-		Recorrido:    trafico.Recorrer(f, u, trafico.DesdeNodo(pod.Nodo)),
-		Contexto:     f.Contexto,
-		Repeticiones: 1,
-	}
-	if err != nil {
-		out.Error = sinRespuesta.Motivo
+	out := nuevaPrueba(h, p.Tipo, u.String(), pod, f, trafico.Recorrer(f, u, trafico.DesdeNodo(pod.Nodo)), 1)
+	if !intentada {
+		out.Error = motivo
 	} else {
 		out.Conexion = &conexionTCP{
 			Resultado: res.Resultado,

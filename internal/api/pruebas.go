@@ -140,10 +140,10 @@ func mandarPrueba(cluster Cluster, h *historial) http.HandlerFunc {
 		// si la request pasa por el Ingress Controller, cada repetición lleva un X-Request-ID para
 		// encontrarla después en su log y saber a qué pod la mandó
 		host := trafico.ConHost(valorDe(p.Headers, "Host"))
-		porIC := len(trafico.PodsDelIngressController(trafico.Recorrer(cluster.Foto(), u, host))) > 0
+		porIngressController := len(trafico.PodsDelIngressController(trafico.Recorrer(cluster.Foto(), u, host))) > 0
 		armar := func() (sondeo.PedidoHTTP, string) {
 			pedido := sondeo.PedidoHTTP{Metodo: metodo, URL: u.String(), Headers: p.Headers, Body: p.Body}
-			if !porIC {
+			if !porIngressController {
 				return pedido, ""
 			}
 			if id := valorDe(p.Headers, trafico.HeaderDeRequest); id != "" {
@@ -156,67 +156,58 @@ func mandarPrueba(cluster Cluster, h *historial) http.HandlerFunc {
 
 		ctx, cancelar := context.WithTimeout(r.Context(), esperaPrueba+time.Duration(p.Repeticiones-1)*sondeo.EsperaRequest)
 		defer cancelar()
-		pedido, id := armar()
-		res, pod, err := s.HTTP(ctx, pedido)
-		var sinRespuesta sondeo.SinRespuesta
-		if err != nil && !errors.As(err, &sinRespuesta) {
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
 		// las repeticiones van una detrás de otra; la primera es la que se muestra
-		var respuestas []trafico.Respuesta
-		var ids []string
-		sinRespuestas := 0
-		if err == nil {
-			respuestas, ids = append(respuestas, trafico.Respuesta{Body: res.Body}), append(ids, id)
-		} else {
-			sinRespuestas++
-		}
-		for range p.Repeticiones - 1 {
+		var (
+			pod              sondeo.Pod
+			primera          sondeo.RespuestaHTTP
+			primeraRespondio bool
+			motivo           string // por qué la primera no tuvo respuesta
+			respuestas       []trafico.Respuesta
+			ids              []string
+			sinRespuestas    int
+		)
+		for i := range p.Repeticiones {
 			pedido, id := armar()
-			otra, _, errOtra := s.HTTP(ctx, pedido)
-			switch {
-			case errOtra == nil:
-				respuestas, ids = append(respuestas, trafico.Respuesta{Body: otra.Body}), append(ids, id)
-			case errors.As(errOtra, new(sondeo.SinRespuesta)):
-				sinRespuestas++
-			default:
-				http.Error(w, errOtra.Error(), http.StatusServiceUnavailable)
+			res, delSondeo, err := s.HTTP(ctx, pedido)
+			respondio, porQue, falla := resultadoDelSondeo(err)
+			if falla != nil {
+				http.Error(w, falla.Error(), http.StatusServiceUnavailable)
 				return
 			}
+			if i == 0 {
+				pod, primera, primeraRespondio, motivo = delSondeo, res, respondio, porQue
+			}
+			if !respondio {
+				sinRespuestas++
+				continue
+			}
+			respuestas, ids = append(respuestas, trafico.Respuesta{Body: res.Body}), append(ids, id)
 		}
 
 		// el recorrido se calcula con la foto de después de la request: la más cercana a la respuesta
 		f := cluster.Foto()
 		recorrido := trafico.Recorrer(f, u, host, trafico.DesdeNodo(pod.Nodo))
-		if porIC && len(respuestas) > 0 {
+		if porIngressController && len(respuestas) > 0 {
 			upstreams := upstreamsDelIngressController(ctx, cluster, f, recorrido, ids)
 			for i := range respuestas {
 				respuestas[i].Upstream = upstreams[ids[i]]
 			}
 		}
-		out := prueba{
-			ID:        h.nuevoID(),
-			Tipo:      p.Tipo,
-			URL:       u.String(),
-			Metodo:    metodo,
-			Origen:    origen(pod),
-			Recorrido: recorrido,
-		}
-		out.Contexto, out.Repeticiones = f.Contexto, p.Repeticiones
+		out := nuevaPrueba(h, p.Tipo, u.String(), pod, f, recorrido, p.Repeticiones)
+		out.Metodo = metodo
 		if p.Repeticiones > 1 {
 			reparto := trafico.Repartir(f, recorrido, respuestas, sinRespuestas)
 			out.Reparto = &reparto
 		}
-		if err != nil {
-			out.Error = sinRespuesta.Motivo
+		if !primeraRespondio {
+			out.Error = motivo
 		} else {
 			out.Respuesta = &respuestaHTTP{
-				Status:  res.Status,
-				Texto:   http.StatusText(res.Status),
-				Headers: res.Headers,
-				Body:    res.Body,
-				Ms:      float64(res.Duracion.Microseconds()) / 1000,
+				Status:  primera.Status,
+				Texto:   http.StatusText(primera.Status),
+				Headers: primera.Headers,
+				Body:    primera.Body,
+				Ms:      float64(primera.Duracion.Microseconds()) / 1000,
 			}
 			if out.Respuesta.Headers == nil {
 				out.Respuesta.Headers = []sondeo.Header{}
@@ -228,11 +219,11 @@ func mandarPrueba(cluster Cluster, h *historial) http.HandlerFunc {
 	}
 }
 
-// esperaLogDelIC es cuánto se espera a que las líneas de las requests aparezcan en el log del
+// esperaLogDelIngressController es cuánto se espera a que las líneas de las requests aparezcan en el log del
 // Ingress Controller (nginx las escribe al terminar cada request, y el log llega un poco después).
 const (
-	esperaLogDelIC    = 2 * time.Second
-	intervaloLogDelIC = 100 * time.Millisecond
+	esperaLogDelIngressController    = 2 * time.Second
+	intervaloLogDelIngressController = 100 * time.Millisecond
 )
 
 // upstreamsDelIngressController busca en el final del log de los pods del Ingress Controller del
@@ -240,11 +231,11 @@ const (
 // las que no aparecen a tiempo quedan sin upstream.
 func upstreamsDelIngressController(ctx context.Context, cluster Cluster, f foto.Foto, r trafico.Recorrido, ids []string) map[string]string {
 	upstreams := map[string]string{}
-	limite := time.Now().Add(esperaLogDelIC)
+	limite := time.Now().Add(esperaLogDelIngressController)
 	for {
 		var lineas []string
 		for _, ref := range trafico.PodsDelIngressController(r) {
-			pedido, ok := pedidoDeLogDelIC(f, ref.ID)
+			pedido, ok := pedidoDeLogDelIngressController(f, ref.ID)
 			if !ok {
 				continue
 			}
@@ -271,13 +262,14 @@ func upstreamsDelIngressController(ctx context.Context, cluster Cluster, f foto.
 		select {
 		case <-ctx.Done():
 			return upstreams
-		case <-time.After(intervaloLogDelIC):
+		case <-time.After(intervaloLogDelIngressController):
 		}
 	}
 }
 
-// pedidoDeLogDelIC pide las últimas líneas del log del primer container normal del pod.
-func pedidoDeLogDelIC(f foto.Foto, id string) (conexion.PedidoDeLogs, bool) {
+// pedidoDeLogDelIngressController pide las últimas líneas del log del primer container normal
+// del pod del Ingress Controller.
+func pedidoDeLogDelIngressController(f foto.Foto, id string) (conexion.PedidoDeLogs, bool) {
 	for _, p := range f.Pods {
 		if p.ID != id {
 			continue
@@ -299,6 +291,26 @@ func valorDe(headers []sondeo.Header, nombre string) string {
 		}
 	}
 	return ""
+}
+
+// resultadoDelSondeo separa el error de un pedido al pod de sondeo: respondio es false si el
+// pedido salió pero no hubo respuesta (sondeo.SinRespuesta, con su motivo); falla es cualquier
+// otro error, del pod de sondeo, que la API responde con 503.
+func resultadoDelSondeo(err error) (respondio bool, motivo string, falla error) {
+	var sin sondeo.SinRespuesta
+	switch {
+	case err == nil:
+		return true, "", nil
+	case errors.As(err, &sin):
+		return false, sin.Motivo, nil
+	}
+	return false, "", err
+}
+
+// nuevaPrueba numera una prueba de la sesión y le pone lo que comparten una request y una prueba
+// de conexión: a dónde fue, desde qué pod de sondeo, el recorrido y el contexto.
+func nuevaPrueba(h *historial, tipo tipoDePrueba, url string, pod sondeo.Pod, f foto.Foto, r trafico.Recorrido, repeticiones int) prueba {
+	return prueba{ID: h.nuevoID(), Tipo: tipo, URL: url, Origen: origen(pod), Recorrido: r, Contexto: f.Contexto, Repeticiones: repeticiones}
 }
 
 func nuevoIDDeRequest() string {
