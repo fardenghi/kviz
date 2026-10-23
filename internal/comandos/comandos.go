@@ -28,10 +28,30 @@ type Objeto struct {
 	Nombre    string
 }
 
+// MetricsServer es el "tipo" de objeto que pide los comandos para instalar metrics-server en
+// kind, cuando el cluster no lo tiene (Foto.Metricas es false). No lleva namespace ni nombre.
+const MetricsServer = "metrics-server"
+
+// instalarMetricsServer instala metrics-server y le agrega --kubelet-insecure-tls: en kind los
+// certificados del kubelet no están firmados por la CA del cluster y, sin esa opción,
+// metrics-server no puede medir.
+func instalarMetricsServer(contexto string) []Comando {
+	k := kubectl{contexto: contexto}
+	sistema := kubectl{contexto: contexto, namespace: "kube-system"}
+	return []Comando{
+		{"Instalar metrics-server", k.linea("apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml")},
+		{"Agregarle --kubelet-insecure-tls (en kind hace falta para que pueda medir)", sistema.linea("patch deployment metrics-server", "--type=json", "-p",
+			`'[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'`)},
+		{"Esperar a que esté listo (el consumo aparece en kviz un minuto después)", sistema.linea("rollout status deployment/metrics-server")},
+	}
+}
+
 // Para devuelve los comandos sugeridos del objeto. ok es false si el objeto no está en la foto.
 func Para(f foto.Foto, o Objeto) (cs []Comando, ok bool) {
 	k := kubectl{contexto: f.Contexto, namespace: o.Namespace}
 	switch o.Tipo {
+	case MetricsServer:
+		return instalarMetricsServer(f.Contexto), true
 	case "Pod":
 		for _, p := range f.Pods {
 			if p.Namespace == o.Namespace && p.Nombre == o.Nombre {
