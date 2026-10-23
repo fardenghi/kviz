@@ -1,28 +1,19 @@
 // Pasos del recorrido (superficie flotante, tarjeta compacta abajo a la izquierda): el destino, la
 // respuesta y los pasos numerados como en la vista. Cerrarla termina el recorrido y el foco vuelve.
-import type { Prueba } from '../prueba';
-import { formatearMs } from './FormularioDePrueba';
+import { lineaDelPedido, type Prueba } from '../prueba';
+import { PastillaDelResultado } from './FormularioDePrueba';
 
 export function TarjetaDelRecorrido({ prueba: p, alCerrar }: { prueba: Prueba; alCerrar: () => void }) {
-  const r = p.respuesta;
   return (
     <section className="flotante tarjeta-recorrido" aria-label="Recorrido">
       <div className="tarjeta-recorrido-cabecera">
         <b>Recorrido</b>
-        {r ? (
-          <span className={r.status < 400 ? 'pastilla pastilla-ok' : 'pastilla pastilla-mal'}>
-            {r.status} {r.texto} · {formatearMs(r.ms)}
-          </span>
-        ) : (
-          <span className="pastilla pastilla-mal">sin respuesta</span>
-        )}
+        <PastillaDelResultado prueba={p} />
         <button className="boton" title="Cerrar el recorrido" onClick={alCerrar}>
           ✕
         </button>
       </div>
-      <div className="mono-texto chica tenue-texto">
-        {p.metodo} {p.url}
-      </div>
+      <div className="mono-texto chica tenue-texto">{lineaDelPedido(p)}</div>
       <ol className="pasos-recorrido">
         {p.recorrido.pasos.map((paso) => (
           <li key={paso.n}>

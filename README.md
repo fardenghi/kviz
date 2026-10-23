@@ -45,7 +45,7 @@ sirve una página que explica cómo compilarla.
 | `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster) |
 | `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle; `env.go`: origen de env; `configmaps.go`: ConfigMaps y Secrets (solo claves); `volumenes.go`: volúmenes y montajes |
 | `internal/advertencias/` | 6 · advertencias de configuración: las seis reglas de las historias 70–75, puras sobre la foto (y los objetos de los que sale), con explicación y comando sugerido; viajan en `foto.advertencias` |
-| `internal/sondeo/` | 10 · pod de sondeo: ciclo de vida en `kviz-system` (`sondeo.go`: se crea con la primera request, huérfanos al conectarse, se borra al cerrar o al cambiar de contexto) y `Ejecutor`, la interfaz "ejecutar y devolver el resultado crudo" (`exec.go`: curl por exec; en los tests, `sondeoDePrueba`) |
+| `internal/sondeo/` | 10 · pod de sondeo: ciclo de vida en `kviz-system` (`sondeo.go`: se crea con la primera request, huérfanos al conectarse, se borra al cerrar o al cambiar de contexto) y `Ejecutor`, la interfaz "ejecutar y devolver el resultado crudo" (`exec.go`: curl por exec; `conexion.go`: prueba de conexión TCP con curl telnet://; en los tests, `sondeoDePrueba`) |
 | `internal/trafico/` | 11 · depuración de tráfico, puro: URL del destino, recorrido desde la foto (`Recorrer`) y pod que respondió (`PodQueRespondio`, `ConRespuesta`) |
 | `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto) |
 | `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/secreto` en `secreto.go`, `POST /api/pruebas` en `pruebas.go`), canal de streaming (`GET /api/stream`, `stream.go`), logs de un container (`GET /api/logs`, `logs.go`) y costura 1 |
@@ -107,6 +107,12 @@ manda la request desde el pod de sondeo y responde `{"id", "url", "origen", "res
 "texto", "headers", "body", "ms"} | null, "error", "recorrido": {"pasos": [{"n", "tipo", "titulo",
 "detalle", "objetos": [{"tipo", "id"}]}]}}`. Los `objetos` de cada paso son refs a la foto (tipo e
 `id` de su lista); la escena los convierte a ids de escena (`escena/recorrido.ts`, `idEnEscena`), así
-un paso nuevo (DNS, puerta, Ingress, salto) se dibuja sin tocar la escena. El pod de sondeo
+un paso nuevo (DNS, puerta, Ingress, salto) se dibuja sin tocar la escena.
+
+La prueba de conexión TCP es el mismo `POST /api/pruebas` con `{"tipo": "tcp", "destino":
+"host:puerto"}` (`internal/api/conexion.go`): el pod de sondeo abre una conexión con `curl
+telnet://` sin hablar ningún protocolo (`internal/sondeo/conexion.go`, que corta el exec apenas curl
+avisa que conectó) y la respuesta trae `"conexion": {"resultado": "abre" | "rechaza" | "timeout",
+"ms", "motivo"}` en lugar de `respuesta`, con el mismo recorrido (`trafico.URLTCP` → `Recorrer`). El pod de sondeo
 (`curlimages/curl`, en `kviz-system`, con las etiquetas `sondeo.Etiquetas`) es la única escritura de
 kviz en el cluster, además de crear `kviz-system` si no existe.
