@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	listerscorev1 "k8s.io/client-go/listers/core/v1"
+	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -33,6 +34,8 @@ type Conexion struct {
 	sincronizada atomic.Bool
 	nodos        listerscorev1.NodeLister
 	pods         listerscorev1.PodLister
+	services     listerscorev1.ServiceLister
+	slices       listersdiscoveryv1.EndpointSliceLister
 }
 
 // Nueva arma una conexión sobre un cliente ya creado. En producción el cliente sale de
@@ -84,9 +87,14 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	pods := fabrica.Core().V1().Pods()
 	c.nodos = nodos.Lister()
 	c.pods = pods.Lister()
+	services := fabrica.Core().V1().Services()
+	slices := fabrica.Discovery().V1().EndpointSlices()
+	c.services = services.Lister()
+	c.slices = slices.Lister()
 
 	fabrica.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), nodos.Informer().HasSynced, pods.Informer().HasSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), nodos.Informer().HasSynced, pods.Informer().HasSynced,
+		services.Informer().HasSynced, slices.Informer().HasSynced) {
 		return fmt.Errorf("no se pudo sincronizar con el cluster %q", c.contexto)
 	}
 	c.sincronizada.Store(true)
@@ -98,7 +106,9 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 func (c *Conexion) Objetos() foto.Objetos {
 	nodos, _ := c.nodos.List(labels.Everything())
 	pods, _ := c.pods.List(labels.Everything())
-	return foto.Objetos{Nodos: nodos, Pods: pods}
+	services, _ := c.services.List(labels.Everything())
+	slices, _ := c.slices.List(labels.Everything())
+	return foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices}
 }
 
 // Foto es la foto actual del cluster, o una foto desconectada con el motivo.

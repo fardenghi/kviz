@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // Foto es el estado del cluster tal como lo ve la interfaz.
@@ -20,6 +22,8 @@ type Foto struct {
 	Motivo string `json:"motivo,omitempty"`
 	Nodos  []Nodo `json:"nodos"`
 	Pods   []Pod  `json:"pods"`
+	// Services ordenados por namespace y nombre.
+	Services []Service `json:"services"`
 }
 
 type Nodo struct {
@@ -38,16 +42,52 @@ type Pod struct {
 	Fase string `json:"fase"`
 }
 
+// Service es un Service con sus endpoints, tomados de sus EndpointSlices.
+type Service struct {
+	Nombre    string `json:"nombre"`
+	Namespace string `json:"namespace"`
+	// Tipo es spec.type: ClusterIP, NodePort, LoadBalancer o ExternalName.
+	Tipo string `json:"tipo"`
+	// ClusterIP es "None" en un Service headless y "" si no tiene (ExternalName).
+	ClusterIP string            `json:"clusterIP"`
+	Puertos   []PuertoService   `json:"puertos"`
+	Selector  map[string]string `json:"selector"`
+	// Endpoints listos y no listos, ordenados por IP.
+	Endpoints []Endpoint `json:"endpoints"`
+}
+
+type PuertoService struct {
+	Nombre    string `json:"nombre"`
+	Protocolo string `json:"protocolo"`
+	Puerto    int32  `json:"puerto"`
+	// TargetPort es un número, o el nombre de un puerto de los containers.
+	TargetPort intstr.IntOrString `json:"targetPort"`
+	// NodePort es 0 si el Service no abre un puerto en los nodos.
+	NodePort int32 `json:"nodePort,omitempty"`
+}
+
+// Endpoint es una dirección de una EndpointSlice del Service.
+type Endpoint struct {
+	IP string `json:"ip"`
+	// Pod es el nombre del pod (del namespace del Service) detrás del endpoint, si se sabe.
+	Pod  *string `json:"pod"`
+	Nodo *string `json:"nodo"`
+	// Listo es conditions.ready; sin valor cuenta como listo, como dice la API.
+	Listo bool `json:"listo"`
+}
+
 // Objetos son los objetos de Kubernetes de los que sale la foto.
 type Objetos struct {
-	Nodos []*corev1.Node
-	Pods  []*corev1.Pod
+	Nodos          []*corev1.Node
+	Pods           []*corev1.Pod
+	Services       []*corev1.Service
+	EndpointSlices []*discoveryv1.EndpointSlice
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena nodos por nombre
 // y pods por namespace y nombre, así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
-	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}}
+	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o)}
 	for _, n := range o.Nodos {
 		f.Nodos = append(f.Nodos, Nodo{Nombre: n.Name, InternalIP: internalIP(n)})
 	}
@@ -74,7 +114,88 @@ func Construir(contexto string, o Objetos) Foto {
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}}
+	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}}
+}
+
+func services(o Objetos) []Service {
+	// las EndpointSlices se ligan a su Service por la etiqueta kubernetes.io/service-name
+	slices := map[string][]*discoveryv1.EndpointSlice{}
+	for _, es := range o.EndpointSlices {
+		if svc := es.Labels[discoveryv1.LabelServiceName]; svc != "" {
+			slices[es.Namespace+"/"+svc] = append(slices[es.Namespace+"/"+svc], es)
+		}
+	}
+
+	out := []Service{}
+	for _, s := range o.Services {
+		svc := Service{
+			Nombre:    s.Name,
+			Namespace: s.Namespace,
+			Tipo:      string(s.Spec.Type),
+			ClusterIP: s.Spec.ClusterIP,
+			Puertos:   []PuertoService{},
+			Selector:  s.Spec.Selector,
+			Endpoints: endpoints(slices[s.Namespace+"/"+s.Name]),
+		}
+		if svc.Tipo == "" {
+			svc.Tipo = string(corev1.ServiceTypeClusterIP)
+		}
+		if svc.Selector == nil {
+			svc.Selector = map[string]string{}
+		}
+		for _, p := range s.Spec.Ports {
+			target := p.TargetPort
+			if target.Type == intstr.Int && target.IntVal == 0 {
+				// sin targetPort, Kubernetes manda el tráfico al mismo número de puerto
+				target = intstr.FromInt32(p.Port)
+			}
+			svc.Puertos = append(svc.Puertos, PuertoService{
+				Nombre:     p.Name,
+				Protocolo:  string(p.Protocol),
+				Puerto:     p.Port,
+				TargetPort: target,
+				NodePort:   p.NodePort,
+			})
+		}
+		out = append(out, svc)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Namespace != b.Namespace {
+			return a.Namespace < b.Namespace
+		}
+		return a.Nombre < b.Nombre
+	})
+	return out
+}
+
+// endpoints junta las direcciones de las EndpointSlices de un Service, sin repetir: una misma
+// dirección puede aparecer en varias slices (por ejemplo, una por cada conjunto de puertos).
+func endpoints(slices []*discoveryv1.EndpointSlice) []Endpoint {
+	out := []Endpoint{}
+	vistos := map[string]bool{}
+	for _, es := range slices {
+		for _, e := range es.Endpoints {
+			var pod *string
+			if e.TargetRef != nil && e.TargetRef.Kind == "Pod" {
+				pod = opcional(e.TargetRef.Name)
+			}
+			var nodo *string
+			if e.NodeName != nil {
+				nodo = opcional(*e.NodeName)
+			}
+			listo := e.Conditions.Ready == nil || *e.Conditions.Ready
+			for _, ip := range e.Addresses {
+				if vistos[ip] {
+					continue
+				}
+				vistos[ip] = true
+				out = append(out, Endpoint{IP: ip, Pod: pod, Nodo: nodo, Listo: listo})
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].IP < out[j].IP })
+	return out
 }
 
 func internalIP(n *corev1.Node) string {
