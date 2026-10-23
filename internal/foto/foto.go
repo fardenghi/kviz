@@ -35,6 +35,8 @@ type Foto struct {
 	Ingress []Ingress `json:"ingress"`
 	// Puertas ordenadas por id (nodo, puerto y protocolo).
 	Puertas []Puerta `json:"puertas"`
+	// Events del cluster ordenados por id (namespace y nombre del Event; ver events.go).
+	Events []Event `json:"events"`
 }
 
 type Nodo struct {
@@ -121,6 +123,7 @@ type Objetos struct {
 	Services       []*corev1.Service
 	EndpointSlices []*discoveryv1.EndpointSlice
 	Ingress        []*networkingv1.Ingress
+	Events         []corev1.Event
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
@@ -153,12 +156,13 @@ func Construir(contexto string, o Objetos) Foto {
 	}
 	sort.Slice(f.Pods, func(i, j int) bool { return f.Pods[i].ID < f.Pods[j].ID })
 	f.Puertas = puertas(f.Nodos, f.Services, o)
+	f.Events = events(f, o)
 	return f
 }
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
+	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}, Events: []Event{}}
 }
 
 func services(o Objetos) []Service {
