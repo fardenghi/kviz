@@ -18,6 +18,8 @@ export interface PropsDeSeccion {
   foto: Foto;
   /** Abre en el panel otro objeto, por su id de selección (un pod de un Service, el nodo de un pod…). */
   abrir: (id: string) => void;
+  /** Abre el formulario de request de prueba con el destino ya completado (`host:puerto`). */
+  probar?: (destino: string) => void;
 }
 
 export const idDeWorkload = (w: Pick<Workload, 'id'>) => `workload:${w.id}`;

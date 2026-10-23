@@ -44,15 +44,19 @@ sirve una página que explica cómo compilarla.
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
 | `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster) |
 | `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle |
+| `internal/sondeo/` | 10 · pod de sondeo: ciclo de vida en `kviz-system` (`sondeo.go`: se crea con la primera request, huérfanos al conectarse, se borra al cerrar o al cambiar de contexto) y `Ejecutor`, la interfaz "ejecutar y devolver el resultado crudo" (`exec.go`: curl por exec; en los tests, `sondeoDePrueba`) |
+| `internal/trafico/` | 11 · depuración de tráfico, puro: URL del destino, recorrido desde la foto (`Recorrer`) y pod que respondió (`PodQueRespondio`, `ConRespuesta`) |
 | `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto) |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
+| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/pruebas` en `pruebas.go`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
 | `web/src/escena/` | escena de la vista de topología: función pura (costura 2) |
+| `web/src/escena/recorrido.ts` | recorrido de una request de prueba: pasos numerados por objeto, atenuado, tono `recorrido`; apaga el foco |
+| `web/src/prueba.ts` | espejo TypeScript de la request de prueba y su recorrido (`POST /api/pruebas`) |
 | `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
-| `web/src/superficies/` | superficies flotantes (lista de workloads, …) |
+| `web/src/superficies/` | superficies flotantes (lista de workloads, formulario de request de prueba, tarjeta del recorrido, …) |
 | `web/src/detalle/` | panel de detalle (cajón a la derecha): `detalle.ts` qué objeto muestra; una sección por archivo en `secciones/` (ver `secciones.ts`); `Comando.tsx` comando sugerido con botón de copiar |
 | `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
 
@@ -80,3 +84,14 @@ reintenta con un cliente nuevo del kubeconfig hasta que el cluster vuelve. Sin c
 que kubectl tenga uno. El stream manda la foto completa (`tipo: "foto"`) cada vez que cambia el
 contexto o el estado de conexión. En los tests, `kubeconfigDePrueba` (`internal/api/contexto_test.go`)
 tiene varios clusters falsos que se pueden crear, borrar o hacer caer.
+
+## Request de prueba y pod de sondeo
+
+`POST /api/pruebas` con `{"destino", "metodo", "path", "headers": [{"nombre","valor"}], "body"}`
+manda la request desde el pod de sondeo y responde `{"id", "url", "origen", "respuesta": {"status",
+"texto", "headers", "body", "ms"} | null, "error", "recorrido": {"pasos": [{"n", "tipo", "titulo",
+"detalle", "objetos": [{"tipo", "id"}]}]}}`. Los `objetos` de cada paso son refs a la foto (tipo e
+`id` de su lista); la escena los convierte a ids de escena (`escena/recorrido.ts`, `idEnEscena`), así
+un paso nuevo (DNS, puerta, Ingress, salto) se dibuja sin tocar la escena. El pod de sondeo
+(`curlimages/curl`, en `kviz-system`, con las etiquetas `sondeo.Etiquetas`) es la única escritura de
+kviz en el cluster, además de crear `kviz-system` si no existe.

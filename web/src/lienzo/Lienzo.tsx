@@ -161,7 +161,7 @@ function Conexion({ conexion: c }: { conexion: ConexionEnEscena }) {
     <path
       d={`M${a.x},${a.y} C${a.x},${my} ${b.x},${my} ${b.x},${b.y}`}
       className={clases('conexion', `conexion-${c.tono}`, !!c.dePuerta && 'conexion-puerta')}
-      markerEnd={c.tono === 'foco' ? 'url(#flecha)' : undefined}
+      markerEnd={c.tono === 'foco' || c.tono === 'recorrido' ? 'url(#flecha)' : undefined}
     />
   );
 }
@@ -170,7 +170,7 @@ function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apu
   const puertos = s.puertos.join(', ');
   return (
     <g className="objeto" opacity={s.opacidad} {...apuntar}>
-      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className={clases('service', s.resaltado && 'resaltado')} />
+      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className={clases('service', s.resaltado && 'resaltado', s.pasos.length > 0 && 'en-recorrido')} />
       <text x={s.x + 20} y={s.y + 20} className="pod-nombre">
         {recortar(s.nombre, s.ancho - 12 - 6.2 * (s.tipo.length + 1))} <tspan className="tipo">{s.tipo}</tspan>
         <title>{`Service ${s.nombre} · namespace ${s.namespace}`}</title>
@@ -180,6 +180,7 @@ function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apu
         {recortar(puertos, s.ancho)}
         <title>{puertos}</title>
       </text>
+      <Pasos x={s.x + 14} y={s.y} pasos={s.pasos} />
     </g>
   );
 }
@@ -187,7 +188,7 @@ function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apu
 function TarjetaIngress({ ingress: i, apuntar }: { ingress: IngressEnEscena; apuntar: Apuntar }) {
   return (
     <g className="objeto" opacity={i.opacidad} {...apuntar}>
-      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className={clases('ingress', i.resaltado && 'resaltado')} />
+      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className={clases('ingress', i.resaltado && 'resaltado', i.pasos.length > 0 && 'en-recorrido')} />
       <text x={i.x + 12} y={i.y + 22} className="pod-nombre">
         {recortar(i.nombre, i.ancho - 6.2 * (i.clase.length + 10))} <tspan className="tipo">Ingress · {i.clase}</tspan>
         <title>{`Ingress ${i.nombre} · namespace ${i.namespace}`}</title>
@@ -198,6 +199,7 @@ function TarjetaIngress({ ingress: i, apuntar }: { ingress: IngressEnEscena; apu
           <title>{r}</title>
         </text>
       ))}
+      <Pasos x={i.x} y={i.y} pasos={i.pasos} />
     </g>
   );
 }
@@ -205,9 +207,17 @@ function TarjetaIngress({ ingress: i, apuntar }: { ingress: IngressEnEscena; apu
 function PestanaPuerta({ puerta: p, apuntar }: { puerta: PuertaEnEscena; apuntar: Apuntar }) {
   return (
     <g className="objeto" opacity={p.opacidad} {...apuntar}>
-      <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={5} className={clases('puerta', `puerta-${p.tipo}`, p.resaltado && 'resaltado')} />
+      <rect
+        x={p.x}
+        y={p.y}
+        width={p.ancho}
+        height={p.alto}
+        rx={5}
+        className={clases('puerta', `puerta-${p.tipo}`, p.resaltado && 'resaltado', p.pasos.length > 0 && 'en-recorrido')}
+      />
       <text x={p.x + p.ancho / 2} y={p.y + 16} className={`puerta-texto puerta-texto-${p.tipo}`}>{p.texto}</text>
       <title>{p.titulo}</title>
+      <Pasos x={p.x} y={p.y} pasos={p.pasos} />
     </g>
   );
 }
@@ -248,7 +258,13 @@ function TarjetaPod({ pod: p, apuntar }: { pod: PodEnEscena; apuntar: Apuntar })
         width={p.ancho}
         height={p.alto}
         rx={8}
-        className={clases('pod', p.tonoEstado === 'mal' && 'pod-mal', p.nuevo && 'pod-nuevo', p.resaltado && 'resaltado')}
+        className={clases(
+          'pod',
+          p.tonoEstado === 'mal' && 'pod-mal',
+          p.nuevo && 'pod-nuevo',
+          p.resaltado && 'resaltado',
+          p.pasos.length > 0 && 'en-recorrido',
+        )}
         style={{
           ...(p.bordeWorkload ? { stroke: p.bordeWorkload, strokeWidth: 2.5 } : {}),
           ...(p.nuevo ? brillo : {}),
@@ -286,6 +302,7 @@ function TarjetaPod({ pod: p, apuntar }: { pod: PodEnEscena; apuntar: Apuntar })
       {p.reinicios !== null && (
         <Reinicios key={p.reinicios} x={p.x + p.ancho - 8} y={p.y + 52} n={p.reinicios} titila={p.reiniciosTitilan} />
       )}
+      <Pasos x={p.x} y={p.y} pasos={p.pasos} />
     </g>
   );
 }
@@ -299,5 +316,19 @@ function Reinicios({ x, y, n, titila }: { x: number; y: number; n: number; titil
       ↻ {n}
       <title>{`${n} reinicios`}</title>
     </text>
+  );
+}
+
+// números rosas de los pasos del recorrido, sobre la esquina de arriba a la izquierda del objeto
+function Pasos({ x, y, pasos }: { x: number; y: number; pasos: number[] }) {
+  return (
+    <>
+      {pasos.map((n, i) => (
+        <g key={n} className="paso">
+          <circle cx={x + i * 22} cy={y} r={10} className="paso-circulo" />
+          <text x={x + i * 22} y={y + 4} className="paso-texto">{n}</text>
+        </g>
+      ))}
+    </>
   );
 }
