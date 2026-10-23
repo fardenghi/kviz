@@ -12,7 +12,7 @@ const pod = (nombre: string, nodo: string | null, ip: string | null = '10.244.0.
   ip,
   fase: nodo ? 'Running' : 'Pending',
 });
-const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], ...parte });
+const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], services: [], ...parte });
 
 describe('regiones de nodo', () => {
   it('ubica los nodos lado a lado, en el orden de la foto y sin pisarse', () => {
