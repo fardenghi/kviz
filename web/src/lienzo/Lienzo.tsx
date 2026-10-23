@@ -8,6 +8,7 @@ import type {
   PodEnEscena,
   PuertaEnEscena,
   RegionEnEscena,
+  SaltoEnEscena,
   ServiceEnEscena,
 } from '../escena/escena';
 import { BRILLO_POD_NUEVO } from '../tiempoReal';
@@ -111,6 +112,9 @@ export function Lienzo({
           {escena.conexiones.map((c) => (
             <Conexion key={c.id} conexion={c} />
           ))}
+          {escena.saltos.map((s) => (
+            <Salto key={s.id} salto={s} />
+          ))}
           {escena.ingress.map((i) => (
             <TarjetaIngress key={i.id} ingress={i} apuntar={apuntar(i.id)} />
           ))}
@@ -146,9 +150,17 @@ function Region({ region: r }: { region: RegionEnEscena }) {
   // la región de un nodo se abre en el panel de detalle; la de "Sin nodo asignado", no
   return (
     <g data-objeto={r.nodo ? r.id : undefined}>
-      <rect x={r.x} y={r.y} width={r.ancho} height={r.alto} rx={14} className={r.nodo ? 'region' : 'region region-sin-nodo'} />
+      <rect
+        x={r.x}
+        y={r.y}
+        width={r.ancho}
+        height={r.alto}
+        rx={14}
+        className={clases('region', !r.nodo && 'region-sin-nodo', r.pasos.length > 0 && 'en-recorrido')}
+      />
       <text x={r.x + 16} y={r.y + 25} className="region-titulo">{r.titulo}</text>
       <text x={r.x + 16} y={r.y + 40} className="mono tenue">{r.subtitulo}</text>
+      <Pasos x={r.x} y={r.y} pasos={r.pasos} />
     </g>
   );
 }
@@ -163,6 +175,17 @@ function Conexion({ conexion: c }: { conexion: ConexionEnEscena }) {
       className={clases('conexion', `conexion-${c.tono}`, !!c.dePuerta && 'conexion-puerta')}
       markerEnd={c.tono === 'foco' || c.tono === 'recorrido' ? 'url(#flecha)' : undefined}
     />
+  );
+}
+
+// arco del salto entre nodos: pasa por debajo de las regiones, con su etiqueta en el punto más bajo
+function Salto({ salto: s }: { salto: SaltoEnEscena }) {
+  const { desde: a, hasta: b, yControl: c } = s;
+  return (
+    <g opacity={s.opacidad}>
+      <path d={`M${a.x},${a.y} C${a.x},${c} ${b.x},${c} ${b.x},${b.y}`} className="conexion conexion-recorrido salto" markerEnd="url(#flecha)" />
+      <text x={s.etiquetaEn.x} y={s.etiquetaEn.y + 16} className="salto-etiqueta">{s.etiqueta}</text>
+    </g>
   );
 }
 

@@ -164,6 +164,9 @@ g.objeto { cursor: pointer; transition: opacity .15s; }
 .conexion-puerta.conexion-recorrido { stroke: var(--recorrido); stroke-dasharray: 7 5; }
 @keyframes hormigas { to { stroke-dashoffset: -12; } }
 @media (prefers-reduced-motion: reduce) { .conexion-recorrido { animation: none; } }
+.region.en-recorrido { stroke: var(--recorrido); stroke-width: 2.5; }
+.salto { fill: none; }
+.salto-etiqueta { fill: var(--recorrido); font-size: 11.5px; font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: var(--fondo); stroke-width: 4px; stroke-linejoin: round; }
 .paso-circulo { fill: var(--recorrido); stroke: #fff; stroke-width: 2; }
 .paso-texto { fill: #fff; font-size: 11px; font-weight: 800; text-anchor: middle; pointer-events: none; }
 
@@ -189,6 +192,12 @@ g.objeto { cursor: pointer; transition: opacity .15s; }
 .tarjeta-recorrido-cabecera .boton { margin-left: auto; }
 .pasos-recorrido { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
 .pasos-recorrido li { display: grid; grid-template-columns: 22px 1fr; gap: 6px; align-items: start; }
+.paso-de-la-tarjeta { cursor: pointer; border-radius: 6px; padding: 2px; }
+.paso-de-la-tarjeta:hover { background: #fdf0f6; }
+.paso-elegido { background: #fde4ef; }
+.paso-apagado { opacity: .45; }
+.entrar-por-nodo select { margin-left: 6px; }
+.todos-los-pasos { margin-top: 6px; }
 .paso-numero { width: 20px; height: 20px; border-radius: 50%; background: var(--recorrido); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
 .paso-titulo { font-family: var(--mono); font-size: 11px; word-break: break-all; }
 /* reparto de una request repetida: pastilla sobre cada pod y barras en la tarjeta (ticket 18) */

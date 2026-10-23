@@ -46,14 +46,14 @@ sirve una página que explica cómo compilarla.
 | `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle; `env.go`: origen de env; `configmaps.go`: ConfigMaps y Secrets (solo claves); `volumenes.go`: volúmenes y montajes; `probes.go`: 3 · estado de probe; `recursos.go`: requests, limits y consumo |
 | `internal/advertencias/` | 6 · advertencias de configuración: las seis reglas de las historias 70–75, puras sobre la foto (y los objetos de los que sale), con explicación y comando sugerido; viajan en `foto.advertencias` |
 | `internal/sondeo/` | 10 · pod de sondeo: ciclo de vida en `kviz-system` (`sondeo.go`: se crea con la primera request, huérfanos al conectarse, se borra al cerrar o al cambiar de contexto) y `Ejecutor`, la interfaz "ejecutar y devolver el resultado crudo" (`exec.go`: curl por exec; `conexion.go`: prueba de conexión TCP con curl telnet://; en los tests, `sondeoDePrueba`) |
-| `internal/trafico/` | 11 · depuración de tráfico, puro: URL del destino, recorrido desde la foto (`Recorrer`) y pod que respondió (`PodQueRespondio`, `ConRespuesta`) |
+| `internal/trafico/` | 11 · depuración de tráfico, puro: URL del destino, recorrido desde la foto (`Recorrer` en `recorrer.go`: DNS, puerta, Service, endpoints; `ingress.go`: regla de Ingress y rewrite como ingress-nginx), pod que respondió y salto entre nodos (`respuesta.go`: `PodQueRespondio` por el body o el log del Ingress Controller, `ConRespuesta`) y reparto |
 | `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto); `tipo=metrics-server` da cómo instalarlo en kind |
 | `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/secreto` en `secreto.go`, `POST /api/pruebas` en `pruebas.go`, historial `GET /api/pruebas[/{id}]` en `historial.go`), canal de streaming (`GET /api/stream`, `stream.go`), logs de un container (`GET /api/logs`, `logs.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
 | `web/src/escena/` | escena de la vista de topología: función pura (costura 2) |
-| `web/src/escena/recorrido.ts` | recorrido de una request de prueba: pasos numerados por objeto, atenuado, tono `recorrido`; apaga el foco |
+| `web/src/escena/recorrido.ts` | recorrido de una request de prueba: pasos numerados por objeto (y región), atenuado, tono `recorrido`, arco de salto entre nodos, paso elegido, pods del Ingress Controller visibles; apaga el foco |
 | `web/src/prueba.ts` | espejo TypeScript de la request de prueba y su recorrido (`POST /api/pruebas`) |
 | `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
@@ -110,6 +110,17 @@ manda la request desde el pod de sondeo y responde `{"id", "url", "origen", "res
 un paso nuevo (DNS, puerta, Ingress, salto) se dibuja sin tocar la escena. El pod de sondeo
 (`curlimages/curl`, en `kviz-system`, con las etiquetas `sondeo.Etiquetas`) es la única escritura de
 kviz en el cluster, además de crear `kviz-system` si no existe.
+
+El destino puede ser un Service (nombre DNS o ClusterIP), la IP de un pod, o un nodo (nombre o
+InternalIP) con el puerto de una puerta: un NodePort, o el hostPort del Ingress Controller (una ruta
+de Ingress: `lab-worker2:80` con path `/backend/hello`). El recorrido es DNS (si el destino es un
+nombre) → puerta → regla de Ingress con el path reescrito → Service → endpoints, y suma el salto
+entre nodos y el pod solo cuando se sabe qué pod respondió: porque el body trae su nombre, o porque
+el log del Ingress Controller lo dice. Para eso, a una request que pasa por el Ingress Controller
+kviz le agrega `X-Request-ID: kviz-…` (si el pedido no trae uno), que ingress-nginx escribe al final
+de cada línea de su log (`$req_id`), y después lee las últimas líneas del log del controller
+(`GET /api/logs` usa el mismo `Cluster.Logs`, acá sin seguir) para tomar `$upstream_addr`. Una prueba
+de conexión TCP no pasa por las reglas de Ingress: termina en el pod del Ingress Controller.
 
 La prueba de conexión TCP es el mismo `POST /api/pruebas` con `{"tipo": "tcp", "destino":
 "host:puerto"}` (`internal/api/conexion.go`): el pod de sondeo abre una conexión con `curl

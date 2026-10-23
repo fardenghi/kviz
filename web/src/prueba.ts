@@ -95,7 +95,7 @@ export interface Recorrido {
 
 export interface Paso {
   n: number;
-  /** service, endpoints o pod (después: dns, puerta, ingress, salto…). */
+  /** dns, puerta, ingress, service, endpoints, salto o pod (ver internal/trafico). */
   tipo: string;
   /** `backend 10.96.11.121:80 → :8081`. */
   titulo: string;
@@ -106,7 +106,7 @@ export interface Paso {
 
 /** Un objeto de la foto: su tipo y su id en la lista de la foto. */
 export interface RefObjeto {
-  /** service, pod, ingress, puerta o nodo. */
+  /** service, pod, ingress, puerta o nodo. El paso salto marca dos nodos: de dónde sale y a dónde llega. */
   tipo: string;
   /** El `id` del objeto en su lista de la foto (`default/backend`, `lab-worker2/80/TCP`…). */
   id: string;
@@ -128,4 +128,31 @@ export function leerHeaders(texto: string): Header[] {
       return { nombre: l.slice(0, i).trim(), valor: l.slice(i + 1).trim() };
     })
     .filter((h) => h.nombre !== '');
+}
+
+/**
+ * Separa el path de un destino escrito como `host[:puerto]/path` (con o sin esquema), para que el
+ * formulario lo muestre en su campo: `lab-worker2:80/backend/` → `lab-worker2:80` y `/backend/`.
+ */
+export function separarDestino(destino: string): { destino: string; path: string | null } {
+  const esquema = destino.indexOf('://');
+  const desde = esquema >= 0 ? esquema + 3 : 0;
+  const barra = destino.indexOf('/', desde);
+  if (barra < 0) return { destino, path: null };
+  return { destino: destino.slice(0, barra), path: destino.slice(barra) };
+}
+
+/**
+ * El destino entrando por un nodo: cambia el host por el nombre del nodo y deja el esquema y el
+ * puerto (el de un NodePort o un hostPort): `backend.default:30010` → `lab-worker:30010`.
+ */
+export function entrarPorNodo(destino: string, nodo: string): string {
+  const esquema = destino.indexOf('://');
+  const prefijo = esquema >= 0 ? destino.slice(0, esquema + 3) : '';
+  const resto = destino.slice(prefijo.length);
+  const corte = resto.search(/[/?]/);
+  const autoridad = corte >= 0 ? resto.slice(0, corte) : resto;
+  const despues = corte >= 0 ? resto.slice(corte) : '';
+  const puerto = /:(\d+)$/.exec(autoridad)?.[0] ?? '';
+  return prefijo + nodo + puerto + despues;
 }

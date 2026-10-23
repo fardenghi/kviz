@@ -3,28 +3,41 @@
 // pod de sondeo de kviz; abajo se ven status, headers, body y tiempo. Se puede repetir N veces para
 // ver el reparto entre pods, y el historial de la sesión (en la memoria de kviz) vuelve a mostrar
 // la respuesta y el recorrido de cualquier prueba anterior. Con "TCP" es una prueba de conexión:
-// solo el destino `host:puerto`, y abajo si abre, rechaza o da timeout.
+// solo el destino `host:puerto`, y abajo si abre, rechaza o da timeout. Para un NodePort o la
+// puerta de hostPort del Ingress Controller se elige por qué nodo entrar.
 import { type FormEvent, useEffect, useState } from 'react';
 import { mandarPrueba, pedirHistorial } from '../api';
-import { leerHeaders, lineaDelPedido, MAX_REPETICIONES, type Prueba, type TipoDePrueba } from '../prueba';
+import {
+  entrarPorNodo,
+  leerHeaders,
+  lineaDelPedido,
+  MAX_REPETICIONES,
+  type Prueba,
+  separarDestino,
+  type TipoDePrueba,
+} from '../prueba';
 
 const METODOS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
 export function FormularioDePrueba({
   destinoInicial,
+  nodos = [],
   alResponder,
   alCerrar,
 }: {
-  /** Destino ya completado (desde el panel de un Service), o "" para el campo libre. */
+  /** Destino ya completado (desde el panel de un Service o Ingress), o "" para el campo libre; puede traer path. */
   destinoInicial: string;
+  /** Nombres de los nodos, para elegir por cuál entrar a un NodePort o un hostPort. */
+  nodos?: string[];
   /** Llegó la respuesta: la App muestra su recorrido. */
   alResponder: (p: Prueba) => void;
   alCerrar: () => void;
 }) {
   const [tipo, setTipo] = useState<TipoDePrueba>('http');
-  const [destino, setDestino] = useState(destinoInicial);
+  const inicial = separarDestino(destinoInicial);
+  const [destino, setDestino] = useState(inicial.destino);
   const [metodo, setMetodo] = useState('GET');
-  const [path, setPath] = useState('/');
+  const [path, setPath] = useState(inicial.path ?? '/');
   const [headers, setHeaders] = useState('');
   const [body, setBody] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -97,6 +110,19 @@ export function FormularioDePrueba({
             required
           />
         </label>
+        {nodos.length > 0 && (
+          <label className="entrar-por-nodo" title="Para un NodePort o un hostPort: entra por el puerto de ese nodo">
+            entrar por el nodo
+            <select value="" onChange={(e) => e.target.value && setDestino((d) => entrarPorNodo(d, e.target.value))}>
+              <option value="">elegir…</option>
+              {nodos.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {tipo === 'http' && (
           <>
             <div className="fila-pedido">

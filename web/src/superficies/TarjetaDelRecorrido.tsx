@@ -1,10 +1,22 @@
 // Pasos del recorrido (superficie flotante, tarjeta compacta abajo a la izquierda): el destino, la
 // respuesta y los pasos numerados como en la vista; si la request se repitió, las barras del
-// reparto. Cerrarla termina el recorrido y el foco vuelve.
+// reparto. Un clic en un paso resalta solo ese paso en la vista; otro clic (o "todos los pasos")
+// vuelve a mostrarlos todos. Cerrarla termina el recorrido y el foco vuelve.
 import { lineaDelPedido, type Prueba, type Reparto } from '../prueba';
 import { PastillaDelResultado } from './FormularioDePrueba';
 
-export function TarjetaDelRecorrido({ prueba: p, alCerrar }: { prueba: Prueba; alCerrar: () => void }) {
+export function TarjetaDelRecorrido({
+  prueba: p,
+  elegido = null,
+  alElegir,
+  alCerrar,
+}: {
+  prueba: Prueba;
+  /** Número del paso elegido, o null si se ven todos. */
+  elegido?: number | null;
+  alElegir?: (n: number | null) => void;
+  alCerrar: () => void;
+}) {
   return (
     <section className="flotante tarjeta-recorrido" aria-label="Recorrido">
       <div className="tarjeta-recorrido-cabecera">
@@ -15,9 +27,22 @@ export function TarjetaDelRecorrido({ prueba: p, alCerrar }: { prueba: Prueba; a
         </button>
       </div>
       <div className="mono-texto chica tenue-texto">{lineaDelPedido(p)}</div>
+      {elegido !== null && (
+        <button className="boton todos-los-pasos" onClick={() => alElegir?.(null)}>
+          todos los pasos
+        </button>
+      )}
       <ol className="pasos-recorrido">
         {p.recorrido.pasos.map((paso) => (
-          <li key={paso.n}>
+          <li
+            key={paso.n}
+            className={clasesDelPaso(paso.n, elegido)}
+            role="button"
+            tabIndex={0}
+            title={paso.n === elegido ? 'Ver todos los pasos' : 'Resaltar solo este paso'}
+            onClick={() => alElegir?.(paso.n === elegido ? null : paso.n)}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), alElegir?.(paso.n === elegido ? null : paso.n))}
+          >
             <span className="paso-numero">{paso.n}</span>
             <span>
               <b>{NOMBRE_PASO[paso.tipo] ?? paso.tipo}</b> <span className="paso-titulo">{paso.titulo}</span>
@@ -59,6 +84,9 @@ function BarrasDeReparto({ reparto: r }: { reparto: Reparto }) {
     </div>
   );
 }
+
+const clasesDelPaso = (n: number, elegido: number | null) =>
+  ['paso-de-la-tarjeta', n === elegido && 'paso-elegido', elegido !== null && n !== elegido && 'paso-apagado'].filter(Boolean).join(' ');
 
 const NOMBRE_PASO: Record<string, string> = {
   dns: 'DNS',

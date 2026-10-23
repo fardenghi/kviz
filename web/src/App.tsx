@@ -33,6 +33,8 @@ export function App() {
   const [formulario, setFormulario] = useState<{ destino: string; vez: number } | null>(null);
   const [prueba, setPrueba] = useState<Prueba | null>(null);
   const [verRecorrido, setVerRecorrido] = useState(false);
+  // paso del recorrido elegido con un clic en la tarjeta (de qué prueba es: otra prueba muestra todos)
+  const [pasoElegido, setPasoElegido] = useState<{ prueba: number; n: number } | null>(null);
   const probar = (destino: string) => setFormulario((f) => ({ destino, vez: (f?.vez ?? 0) + 1 }));
   const [errorContexto, setErrorContexto] = useState<string | null>(null);
   const refrescarContextos = () =>
@@ -94,6 +96,7 @@ export function App() {
   const pruebaVista = verRecorrido && prueba && prueba.contexto === foto?.contexto ? prueba : null;
   const recorrido = pruebaVista?.recorrido ?? null;
   const reparto = pruebaVista?.reparto ?? null;
+  const paso = pasoElegido && pruebaVista && pasoElegido.prueba === pruebaVista.id ? pasoElegido.n : null;
   const escena = useMemo(
     () =>
       foto?.conectado
@@ -105,11 +108,12 @@ export function App() {
             hover,
             seleccionado,
             recorrido,
+            pasoElegido: paso,
             reparto,
             podsNuevos: podsNuevos(enVivo, Date.now()),
           })
         : null,
-    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado, recorrido, reparto], // eslint-disable-line react-hooks/exhaustive-deps
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado, recorrido, paso, reparto], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // el panel muestra el objeto mientras siga en la foto; si se borra, se cierra solo
@@ -197,6 +201,7 @@ export function App() {
             <FormularioDePrueba
               key={formulario.vez}
               destinoInicial={formulario.destino}
+              nodos={foto?.nodos.map((n) => n.nombre)}
               alResponder={(p) => {
                 setPrueba(p);
                 setVerRecorrido(true);
@@ -205,7 +210,12 @@ export function App() {
             />
           )}
           {recorrido && recorrido.pasos.length > 0 && prueba && (
-            <TarjetaDelRecorrido prueba={prueba} alCerrar={() => setVerRecorrido(false)} />
+            <TarjetaDelRecorrido
+              prueba={prueba}
+              elegido={paso}
+              alElegir={(n) => setPasoElegido(n === null ? null : { prueba: prueba.id, n })}
+              alCerrar={() => setVerRecorrido(false)}
+            />
           )}
           {detalle && foto && (
             <PanelDeDetalle detalle={detalle} foto={foto} abrir={abrir} probar={probar} alCerrar={() => setSeleccionado(null)} />
