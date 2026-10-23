@@ -70,33 +70,56 @@ type kvizDePrueba struct {
 	cliente *fake.Clientset
 }
 
+// intervaloDePrueba es cada cuánto kviz revisa en los tests si el cluster responde.
+const intervaloDePrueba = 20 * time.Millisecond
+
+// nuevoKviz arranca kviz conectado al contexto dado, con un cluster falso cargado con los
+// objetos, y espera a que la foto lo refleje.
 func nuevoKviz(t *testing.T, contexto string, objetos ...runtime.Object) *kvizDePrueba {
+	t.Helper()
+	kc := nuevoKubeconfig(contexto)
+	cluster := kc.crearCluster(contexto, objetos...)
+	k := nuevoKvizConKubeconfig(t, kc)
+	k.cliente = cluster.cliente
+	k.esperarConectado(t)
+	return k
+}
+
+// nuevoKvizConKubeconfig arranca kviz sobre un kubeconfig de prueba, en su contexto actual, sin
+// esperar a que se conecte.
+func nuevoKvizConKubeconfig(t *testing.T, kc conexion.Kubeconfig) *kvizDePrueba {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	cliente := fake.NewClientset(objetos...)
-	c := conexion.Nueva(cliente, contexto)
-	if err := c.Iniciar(ctx); err != nil {
-		t.Fatalf("iniciar conexión: %v", err)
-	}
-	srv := httptest.NewServer(api.Nuevo(c, nil))
+	g := conexion.NuevoGestor(kc, intervaloDePrueba)
+	g.Iniciar(ctx)
+	srv := httptest.NewServer(api.Nuevo(g, nil))
 	t.Cleanup(srv.Close)
-	return &kvizDePrueba{srv: srv, cliente: cliente}
+	return &kvizDePrueba{srv: srv}
 }
 
 // nuevoKvizDesdeKubeconfig arranca kviz como el binario: con el contexto actual del kubeconfig
 // que diga KUBECONFIG. Sirve para los casos en que no hay cluster al que conectarse.
 func nuevoKvizDesdeKubeconfig(t *testing.T) *kvizDePrueba {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	return nuevoKvizConKubeconfig(t, conexion.KubeconfigDeKubectl())
+}
 
-	c := conexion.DesdeKubeconfig()
-	go c.Iniciar(ctx) //nolint:errcheck // sin cluster no hay nada que esperar
-	srv := httptest.NewServer(api.Nuevo(c, nil))
-	t.Cleanup(srv.Close)
-	return &kvizDePrueba{srv: srv}
+// esperarConectado espera a que la foto refleje el cluster.
+func (k *kvizDePrueba) esperarConectado(t *testing.T) {
+	t.Helper()
+	limite := time.Now().Add(5 * time.Second)
+	for {
+		f := k.foto(t)
+		if f.Conectado {
+			return
+		}
+		if time.Now().After(limite) {
+			t.Fatalf("kviz no se conectó: %s", mostrar(f))
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 func (k *kvizDePrueba) foto(t *testing.T) fotoJSON {
