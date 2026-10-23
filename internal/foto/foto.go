@@ -7,6 +7,8 @@ package foto
 import (
 	"sort"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -23,6 +25,8 @@ type Foto struct {
 	Motivo string `json:"motivo,omitempty"`
 	Nodos  []Nodo `json:"nodos"`
 	Pods   []Pod  `json:"pods"`
+	// Workloads son los workloads de arriba de cada cadena de dueños (ver workloads.go).
+	Workloads []Workload `json:"workloads"`
 	// Services ordenados por namespace y nombre.
 	Services []Service `json:"services"`
 	// Ingress ordenados por namespace y nombre.
@@ -45,6 +49,13 @@ type Pod struct {
 	IP *string `json:"ip"`
 	// Fase es status.phase: Pending, Running, Succeeded, Failed o Unknown.
 	Fase string `json:"fase"`
+	// Estado es la columna STATUS de kubectl get pods: Running, Init:0/1, CrashLoopBackOff,
+	// Completed, Terminating…
+	Estado string `json:"estado"`
+	// Containers en orden de vida: init, normales y ephemeral.
+	Containers []Container `json:"containers"`
+	// Workload es el id del workload dueño del pod, o nil si es un Pod suelto.
+	Workload *string `json:"workload"`
 	// HostPorts son los puertos de sus containers que se abren en su nodo.
 	HostPorts []HostPort `json:"hostPorts"`
 }
@@ -87,6 +98,12 @@ type Endpoint struct {
 type Objetos struct {
 	Nodos          []*corev1.Node
 	Pods           []*corev1.Pod
+	Deployments    []*appsv1.Deployment
+	ReplicaSets    []*appsv1.ReplicaSet
+	StatefulSets   []*appsv1.StatefulSet
+	DaemonSets     []*appsv1.DaemonSet
+	Jobs           []*batchv1.Job
+	CronJobs       []*batchv1.CronJob
 	Services       []*corev1.Service
 	EndpointSlices []*discoveryv1.EndpointSlice
 	Ingress        []*networkingv1.Ingress
@@ -95,20 +112,25 @@ type Objetos struct {
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena nodos por nombre
 // y pods por namespace y nombre, así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
-	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Ingress: ingresses(o)}
+	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Workloads: []Workload{}, Ingress: ingresses(o)}
 	for _, n := range o.Nodos {
 		f.Nodos = append(f.Nodos, Nodo{Nombre: n.Name, InternalIP: internalIP(n)})
 	}
 	sort.Slice(f.Nodos, func(i, j int) bool { return f.Nodos[i].Nombre < f.Nodos[j].Nombre })
 
+	workloads, workloadDePod := cadenas(o)
+	f.Workloads = workloads
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
-			Nombre:    p.Name,
-			Namespace: p.Namespace,
-			Nodo:      opcional(p.Spec.NodeName),
-			IP:        opcional(p.Status.PodIP),
-			Fase:      string(p.Status.Phase),
-			HostPorts: hostPorts(p),
+			Nombre:     p.Name,
+			Namespace:  p.Namespace,
+			Nodo:       opcional(p.Spec.NodeName),
+			IP:         opcional(p.Status.PodIP),
+			Fase:       string(p.Status.Phase),
+			Estado:     estadoPod(p),
+			Containers: containers(p),
+			Workload:   opcional(workloadDePod[p.Namespace+"/"+p.Name]),
+			HostPorts:  hostPorts(p),
 		})
 	}
 	sort.Slice(f.Pods, func(i, j int) bool {
@@ -124,7 +146,7 @@ func Construir(contexto string, o Objetos) Foto {
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
+	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
 }
 
 func services(o Objetos) []Service {

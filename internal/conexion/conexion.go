@@ -16,10 +16,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	listersappsv1 "k8s.io/client-go/listers/apps/v1"
+	listersbatchv1 "k8s.io/client-go/listers/batch/v1"
 	listerscorev1 "k8s.io/client-go/listers/core/v1"
 	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	listersnetworkingv1 "k8s.io/client-go/listers/networking/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"kviz/internal/foto"
@@ -35,6 +36,12 @@ type Conexion struct {
 	sincronizada atomic.Bool
 	nodos        listerscorev1.NodeLister
 	pods         listerscorev1.PodLister
+	deployments  listersappsv1.DeploymentLister
+	replicaSets  listersappsv1.ReplicaSetLister
+	statefulSets listersappsv1.StatefulSetLister
+	daemonSets   listersappsv1.DaemonSetLister
+	jobs         listersbatchv1.JobLister
+	cronJobs     listersbatchv1.CronJobLister
 	services     listerscorev1.ServiceLister
 	slices       listersdiscoveryv1.EndpointSliceLister
 	ingress      listersnetworkingv1.IngressLister
@@ -96,9 +103,21 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	ingress := fabrica.Networking().V1().Ingresses()
 	c.ingress = ingress.Lister()
 
+	apps, batch := fabrica.Apps().V1(), fabrica.Batch().V1()
+	c.deployments = apps.Deployments().Lister()
+	c.replicaSets = apps.ReplicaSets().Lister()
+	c.statefulSets = apps.StatefulSets().Lister()
+	c.daemonSets = apps.DaemonSets().Lister()
+	c.jobs = batch.Jobs().Lister()
+	c.cronJobs = batch.CronJobs().Lister()
+
 	fabrica.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), nodos.Informer().HasSynced, pods.Informer().HasSynced,
-		services.Informer().HasSynced, slices.Informer().HasSynced, ingress.Informer().HasSynced) {
+	sincronizados := fabrica.WaitForCacheSync(ctx.Done())
+	todos := len(sincronizados) > 0
+	for _, ok := range sincronizados {
+		todos = todos && ok
+	}
+	if !todos {
 		return fmt.Errorf("no se pudo sincronizar con el cluster %q", c.contexto)
 	}
 	c.sincronizada.Store(true)
@@ -113,7 +132,14 @@ func (c *Conexion) Objetos() foto.Objetos {
 	services, _ := c.services.List(labels.Everything())
 	slices, _ := c.slices.List(labels.Everything())
 	ingress, _ := c.ingress.List(labels.Everything())
-	return foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices, Ingress: ingress}
+	o := foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices, Ingress: ingress}
+	o.Deployments, _ = c.deployments.List(labels.Everything())
+	o.ReplicaSets, _ = c.replicaSets.List(labels.Everything())
+	o.StatefulSets, _ = c.statefulSets.List(labels.Everything())
+	o.DaemonSets, _ = c.daemonSets.List(labels.Everything())
+	o.Jobs, _ = c.jobs.List(labels.Everything())
+	o.CronJobs, _ = c.cronJobs.List(labels.Everything())
+	return o
 }
 
 // Foto es la foto actual del cluster, o una foto desconectada con el motivo.

@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { pedirFoto } from './api';
-import { construirEscena, namespacesDelFiltro } from './escena/escena';
+import { construirEscena, namespacesDelFiltro, workloadsVisibles } from './escena/escena';
 import type { Foto } from './foto';
 import { Lienzo } from './lienzo/Lienzo';
+import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
 
 // Mientras kviz está desconectado vuelve a pedir la foto cada tanto. Las actualizaciones en vivo
 // llegan con el canal de streaming (ticket de tiempo real).
 const REINTENTO_MS = 2000;
 
 export function App() {
-  const [foto, setFoto] = useState<Foto | null>(null);
+  // la foto anterior va a la escena para marcar lo que cambió (reinicios que aumentaron)
+  const [{ foto, fotoAnterior }, setFotos] = useState<{ foto: Foto | null; fotoAnterior?: Foto }>({ foto: null });
+  const setFoto = (f: Foto) => setFotos((s) => ({ foto: f, fotoAnterior: s.foto ?? undefined }));
   const [error, setError] = useState<string | null>(null);
   const [mostrarSistema, setMostrarSistema] = useState(false);
   const [namespace, setNamespace] = useState<string | null>(null);
+  const [workload, setWorkload] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -41,9 +45,15 @@ export function App() {
   const namespaces = useMemo(() => (foto ? namespacesDelFiltro(foto, { mostrarSistema }) : []), [foto, mostrarSistema]);
   // si el namespace elegido deja de ofrecerse (se ocultó el sistema o se fue), el filtro vuelve a "todos"
   const filtro = namespace !== null && namespaces.includes(namespace) ? namespace : null;
-  const escena = useMemo(
-    () => (foto?.conectado ? construirEscena(foto, { mostrarSistema, namespace: filtro }) : null),
+  const workloads = useMemo(
+    () => (foto ? workloadsVisibles(foto, { mostrarSistema, namespace: filtro }) : []),
     [foto, mostrarSistema, filtro],
+  );
+  // si el workload seleccionado se borra o queda oculto por los filtros, se deselecciona
+  const workloadSeleccionado = workload !== null && workloads.some((w) => w.id === workload) ? workload : null;
+  const escena = useMemo(
+    () => (foto?.conectado ? construirEscena(foto, { fotoAnterior, mostrarSistema, namespace: filtro, workloadSeleccionado }) : null),
+    [foto, fotoAnterior, mostrarSistema, filtro, workloadSeleccionado],
   );
 
   return (
@@ -80,7 +90,11 @@ export function App() {
       {error && <div className="aviso">No se pudo hablar con kviz: {error}</div>}
       {!error && !foto && <div className="aviso">Cargando…</div>}
       {!error && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
-      {escena && <Lienzo escena={escena} />}
+      {escena && (
+        <Lienzo escena={escena} alClicEnVacio={() => setWorkload(null)}>
+          <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={setWorkload} />
+        </Lienzo>
+      )}
     </div>
   );
 }

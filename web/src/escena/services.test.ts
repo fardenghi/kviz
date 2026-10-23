@@ -11,6 +11,9 @@ const pod = (nombre: string, nodo: string | null): Pod => ({
   nodo,
   ip: nodo ? '10.244.0.1' : null,
   fase: nodo ? 'Running' : 'Pending',
+  estado: nodo ? 'Running' : 'Pending',
+  containers: [],
+  workload: null,
   hostPorts: [],
 });
 const listo = (pod: string): Endpoint => ({ ip: '10.244.0.1', pod, nodo: null, listo: true });
@@ -25,7 +28,7 @@ const service = (nombre: string, endpoints: Endpoint[] = [], parte: Partial<Serv
   endpoints,
   ...parte,
 });
-const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], services: [], ingress: [], puertas: [], ...parte });
+const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], services: [], workloads: [], ingress: [], puertas: [], ...parte });
 
 const centroX = (c: Caja) => c.x + c.ancho / 2;
 

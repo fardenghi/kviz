@@ -12,6 +12,8 @@ export interface Foto {
   nodos: Nodo[];
   /** Ordenados por namespace y nombre. */
   pods: Pod[];
+  /** Workloads de arriba de cada cadena de dueños, ordenados por namespace y nombre. */
+  workloads: Workload[];
   /** Ordenados por namespace y nombre. */
   services: Service[];
   /** Ordenados por namespace y nombre. */
@@ -34,8 +36,65 @@ export interface Pod {
   ip: string | null;
   /** status.phase: Pending, Running, Succeeded, Failed o Unknown. */
   fase: string;
+  /** Columna STATUS de kubectl get pods: Running, Init:0/1, CrashLoopBackOff, Completed, Terminating… */
+  estado: string;
+  /** En orden de vida: init, normales y ephemeral. */
+  containers: Container[];
+  /** id del workload dueño del pod; null si es un Pod suelto. */
+  workload: string | null;
   /** Puertos de sus containers que se abren en su nodo. */
   hostPorts: HostPort[];
+}
+
+export type TipoDeWorkload = 'Deployment' | 'ReplicaSet' | 'StatefulSet' | 'DaemonSet' | 'Job' | 'CronJob';
+
+/**
+ * Workload de arriba de una cadena de dueños: Deployment, StatefulSet, DaemonSet, CronJob, o un
+ * ReplicaSet o Job sin dueño.
+ */
+export interface Workload {
+  /** `<Tipo>/<namespace>/<nombre>`, por ejemplo `Deployment/default/backend`. */
+  id: string;
+  tipo: TipoDeWorkload;
+  nombre: string;
+  namespace: string;
+  /** Color CSS propio del workload, estable entre actualizaciones. */
+  color: string;
+  /**
+   * Cadena de dueños de arriba hacia abajo: el workload y después sus ReplicaSets o Jobs, del más
+   * nuevo al más viejo. Durante un rollout trae los dos ReplicaSets.
+   */
+  cadena: Eslabon[];
+}
+
+/** Objeto de la cadena de dueños con los pods que crea directamente. */
+export interface Eslabon {
+  tipo: TipoDeWorkload;
+  nombre: string;
+  /** Nombres de sus pods (mismo namespace que el workload). */
+  pods: string[];
+}
+
+/** normal (spec.containers), init (spec.initContainers) o ephemeral (agregado por kubectl debug). */
+export type TipoContainer = 'normal' | 'init' | 'ephemeral';
+
+export interface Container {
+  nombre: string;
+  tipo: TipoContainer;
+  imagen: string;
+  puertos: Puerto[];
+  /** Running, el motivo de la espera (CrashLoopBackOff, PodInitializing…) o de la terminación (Completed, Error…). */
+  estado: string;
+  ready: boolean;
+  started: boolean;
+  reinicios: number;
+}
+
+export interface Puerto {
+  numero: number;
+  /** Nombre del puerto ("http"), si tiene. */
+  nombre?: string;
+  protocolo: string;
 }
 
 export interface HostPort {

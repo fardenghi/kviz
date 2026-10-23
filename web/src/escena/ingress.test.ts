@@ -10,6 +10,9 @@ const pod = (nombre: string, nodo: string | null, namespace = 'default'): Pod =>
   nodo,
   ip: nodo ? '10.244.0.1' : null,
   fase: nodo ? 'Running' : 'Pending',
+  estado: nodo ? 'Running' : 'Pending',
+  containers: [],
+  workload: null,
   hostPorts: [],
 });
 const listo = (pod: string): Endpoint => ({ ip: '10.244.0.1', pod, nodo: null, listo: true });
@@ -56,6 +59,7 @@ const foto = (parte: Partial<Foto>): Foto => ({
   conectado: true,
   nodos: [],
   pods: [],
+  workloads: [],
   services: [],
   ingress: [],
   puertas: [],

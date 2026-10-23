@@ -7,6 +7,8 @@
   --tenue: #8a929c;
   --ok: #2e9e5b;
   --mal: #d23b3b;
+  --aviso: #d39b12;
+  --terminado: #8a94a0;
   --foco: #2f6fde;
   --recorrido: #e8458b;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -66,3 +68,36 @@ body { background: var(--fondo); }
 .conexion { fill: none; stroke: #aab3be; stroke-width: 1.2; }
 .conexion-reposo { opacity: .35; }
 .conexion-no-listo { opacity: .3; stroke-dasharray: 3 4; }
+.pod-mal { fill: #fff8f8; stroke: #f0c4c4; }
+
+/* marcas por pod: estado (solo si no es Running), containers y reinicios */
+.pod-estado { font-size: 10.5px; font-weight: 600; text-anchor: end; }
+.tono-mal { fill: var(--mal); }
+.tono-aviso { fill: var(--aviso); }
+.tono-terminado { fill: var(--terminado); }
+.chip { fill: #f3f4f6; stroke: #c3c9d1; stroke-width: 1; }
+.chip-init { fill: #fff; stroke-dasharray: 3 2; }
+.chip-ephemeral { fill: url(#rayado); stroke: #a18ce0; }
+.chip-resto { fill: #fff; }
+.chip-no-listo { stroke: var(--aviso); }
+.chip-texto { font-family: var(--mono); font-size: 9.5px; text-anchor: middle; fill: var(--tinta); pointer-events: none; }
+.rayado-fondo { fill: #f4f0fd; }
+.rayado-linea { stroke: #d5cbf3; stroke-width: 1.5; }
+.reinicios { font-family: var(--mono); font-size: 10.5px; font-weight: 700; text-anchor: end; fill: var(--mal); }
+.titila { animation: titilar .45s steps(1) 4; }
+@keyframes titilar { 50% { opacity: 0; } }
+
+/* workloads: etiqueta en la tarjeta del pod y lista plegable arriba a la izquierda */
+.pod-workload { font-size: 10px; font-weight: 600; }
+.lista-workloads { left: 12px; top: 12px; width: 220px; max-height: 42%; display: flex; flex-direction: column; overflow: hidden; }
+.lista-workloads-cabecera { font: inherit; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 0; background: none; cursor: pointer; text-align: left; }
+.lista-workloads-cabecera .plegar { margin-left: auto; }
+.lista-workloads-items { list-style: none; margin: 0; padding: 0 4px 6px; overflow-y: auto; }
+.lista-workloads-items .vacio { padding: 4px 8px; font-size: 12px; }
+.workload { font: inherit; font-size: 12px; width: 100%; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 0; border-radius: 6px; background: none; cursor: pointer; text-align: left; }
+.workload:hover { background: #f3f4f6; }
+.workload-elegido { background: #eef1f5; }
+.workload-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workload-tipo { margin-left: auto; font-size: 11px; }
+.muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.cadena { margin: 2px 6px 6px 22px; font-size: 11.5px; display: grid; gap: 2px; }
