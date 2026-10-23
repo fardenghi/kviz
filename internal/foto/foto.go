@@ -7,6 +7,8 @@ package foto
 import (
 	"sort"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -20,6 +22,8 @@ type Foto struct {
 	Motivo string `json:"motivo,omitempty"`
 	Nodos  []Nodo `json:"nodos"`
 	Pods   []Pod  `json:"pods"`
+	// Workloads son los workloads de arriba de cada cadena de dueños (ver workloads.go).
+	Workloads []Workload `json:"workloads"`
 }
 
 type Nodo struct {
@@ -36,25 +40,36 @@ type Pod struct {
 	IP *string `json:"ip"`
 	// Fase es status.phase: Pending, Running, Succeeded, Failed o Unknown.
 	Fase string `json:"fase"`
+	// Workload es el id del workload dueño del pod, o nil si es un Pod suelto.
+	Workload *string `json:"workload"`
 }
 
 // Objetos son los objetos de Kubernetes de los que sale la foto.
 type Objetos struct {
-	Nodos []*corev1.Node
-	Pods  []*corev1.Pod
+	Nodos        []*corev1.Node
+	Pods         []*corev1.Pod
+	Deployments  []*appsv1.Deployment
+	ReplicaSets  []*appsv1.ReplicaSet
+	StatefulSets []*appsv1.StatefulSet
+	DaemonSets   []*appsv1.DaemonSet
+	Jobs         []*batchv1.Job
+	CronJobs     []*batchv1.CronJob
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena nodos por nombre
 // y pods por namespace y nombre, así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
-	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}}
+	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Workloads: []Workload{}}
 	for _, n := range o.Nodos {
 		f.Nodos = append(f.Nodos, Nodo{Nombre: n.Name, InternalIP: internalIP(n)})
 	}
 	sort.Slice(f.Nodos, func(i, j int) bool { return f.Nodos[i].Nombre < f.Nodos[j].Nombre })
 
+	workloads, workloadDePod := cadenas(o)
+	f.Workloads = workloads
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
+			Workload:  opcional(workloadDePod[p.Namespace+"/"+p.Name]),
 			Nombre:    p.Name,
 			Namespace: p.Namespace,
 			Nodo:      opcional(p.Spec.NodeName),
@@ -74,7 +89,7 @@ func Construir(contexto string, o Objetos) Foto {
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}}
+	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Workloads: []Workload{}}
 }
 
 func internalIP(n *corev1.Node) string {
