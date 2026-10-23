@@ -23,6 +23,36 @@ export interface Foto {
   ingress: Ingress[];
   /** Ordenadas por id (nodo, puerto y protocolo: el orden del texto, no el numérico). */
   puertas: Puerta[];
+  /**
+   * Events del cluster, ordenados por id (namespace y nombre del Event). Solo los usan la franja
+   * de events y el panel de detalle (*). Ver events.ts.
+   */
+  events?: EventDelCluster[];
+}
+
+/** Un Event de Kubernetes. Espejo de internal/foto/events.go. */
+export interface EventDelCluster {
+  /** `<namespace>/<nombre>` del Event. */
+  id: string;
+  tipo: 'Normal' | 'Warning' | string;
+  motivo: string;
+  mensaje: string;
+  /** El objeto de Kubernetes al que se refiere (involvedObject); namespace "" si no tiene (un nodo). */
+  objeto: { tipo: string; namespace: string; nombre: string };
+  /**
+   * El objeto de la foto al que se refiere: su sección y su id en ella. Los events de un
+   * ReplicaSet o un Job van al workload de arriba. null si el objeto no está en la foto.
+   */
+  enFoto: ObjetoEnFoto | null;
+  /** Última vez que pasó, en RFC 3339 (UTC); "" si no se sabe. */
+  ultimaVez: string;
+  /** Cuántas veces pasó (al menos 1). */
+  veces: number;
+}
+
+export interface ObjetoEnFoto {
+  seccion: 'pods' | 'nodos' | 'services' | 'ingress' | 'workloads';
+  id: string;
 }
 
 export interface Nodo {

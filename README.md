@@ -52,7 +52,8 @@ sirve una página que explica cómo compilarla.
 | `web/src/escena/` | escena de la vista de topología: función pura (costura 2) |
 | `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
-| `web/src/superficies/` | superficies flotantes (lista de workloads, …) |
+| `web/src/superficies/` | superficies flotantes (lista de workloads, franja de events, …) |
+| `web/src/events.ts` | events del cluster (`internal/foto/events.go`): los de la franja (con los filtros de namespace), el objeto que selecciona un clic y los events de un objeto para el panel |
 | `web/src/detalle/` | panel de detalle (cajón a la derecha): `detalle.ts` qué objeto muestra; una sección por archivo en `secciones/` (ver `secciones.ts`); `Comando.tsx` comando sugerido con botón de copiar |
 | `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
 
