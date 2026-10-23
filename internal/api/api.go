@@ -5,6 +5,8 @@
 //
 //	GET /api/foto   foto completa del cluster (ver internal/foto)
 //	GET /api/stream canal de streaming (Server-Sent Events): la foto y sus cambios (ver stream.go)
+//	GET /api/comandos?tipo=Pod&namespace=default&nombre=nginx
+//	                comandos sugeridos de un objeto de la foto (ver internal/comandos); 404 si no está
 //	GET /           la interfaz compilada (web/dist)
 package api
 
@@ -12,6 +14,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"kviz/internal/comandos"
 	"kviz/internal/foto"
 )
 
@@ -29,6 +32,15 @@ func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 		responderJSON(w, cluster.Foto())
 	})
 	mux.HandleFunc("GET /api/stream", transmitirFoto(cluster))
+	mux.HandleFunc("GET /api/comandos", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		cs, ok := comandos.Para(cluster.Foto(), comandos.Objeto{Tipo: q.Get("tipo"), Namespace: q.Get("namespace"), Nombre: q.Get("nombre")})
+		if !ok {
+			http.Error(w, "no hay ese objeto en la foto", http.StatusNotFound)
+			return
+		}
+		responderJSON(w, cs)
+	})
 	if ui != nil {
 		mux.Handle("GET /", ui)
 	}

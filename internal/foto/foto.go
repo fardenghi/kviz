@@ -42,6 +42,8 @@ type Nodo struct {
 	ID         string `json:"id"`
 	Nombre     string `json:"nombre"`
 	InternalIP string `json:"internalIP"`
+	// Capacidad es status.capacity del nodo (ver detalle.go).
+	Capacidad Capacidad `json:"capacidad"`
 }
 
 type Pod struct {
@@ -49,6 +51,10 @@ type Pod struct {
 	ID        string `json:"id"`
 	Nombre    string `json:"nombre"`
 	Namespace string `json:"namespace"`
+	// Labels del pod; vacío si no tiene.
+	Labels map[string]string `json:"labels"`
+	// Creado es la hora de creación en RFC 3339 (UTC), para calcular la edad; "" si no se sabe.
+	Creado string `json:"creado"`
 	// Nodo es nil cuando el scheduler todavía no le asignó un nodo.
 	Nodo *string `json:"nodo"`
 	// IP es nil mientras el pod no tiene IP.
@@ -122,17 +128,20 @@ type Objetos struct {
 func Construir(contexto string, o Objetos) Foto {
 	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Workloads: []Workload{}, Ingress: ingresses(o)}
 	for _, n := range o.Nodos {
-		f.Nodos = append(f.Nodos, Nodo{ID: n.Name, Nombre: n.Name, InternalIP: internalIP(n)})
+		f.Nodos = append(f.Nodos, Nodo{ID: n.Name, Nombre: n.Name, InternalIP: internalIP(n), Capacidad: capacidadDe(n)})
 	}
 	sort.Slice(f.Nodos, func(i, j int) bool { return f.Nodos[i].ID < f.Nodos[j].ID })
 
 	workloads, workloadDePod := cadenas(o)
 	f.Workloads = workloads
+	completarRollout(f.Workloads, o)
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
 			ID:         p.Namespace + "/" + p.Name,
 			Nombre:     p.Name,
 			Namespace:  p.Namespace,
+			Labels:     etiquetas(p.Labels),
+			Creado:     creado(p.ObjectMeta),
 			Nodo:       opcional(p.Spec.NodeName),
 			IP:         opcional(p.Status.PodIP),
 			Fase:       string(p.Status.Phase),

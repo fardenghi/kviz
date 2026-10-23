@@ -22,6 +22,11 @@ type Workload struct {
 	// y después sus ReplicaSets o Jobs, del más nuevo al más viejo. Un ReplicaSet viejo sin
 	// réplicas ni pods no se muestra; durante un rollout aparecen los dos.
 	Cadena []Eslabon `json:"cadena"`
+	// Replicas son las réplicas deseadas y listas; nil en un Job o un CronJob (ver rollout.go).
+	Replicas *Replicas `json:"replicas"`
+	// Estrategia es la estrategia de rollout, por ejemplo "RollingUpdate (maxSurge 25%,
+	// maxUnavailable 25%)" o "Recreate"; "" si no tiene (ReplicaSet, Job o CronJob).
+	Estrategia string `json:"estrategia"`
 }
 
 // Eslabon es un objeto de la cadena de dueños con los pods que crea directamente.
