@@ -3,8 +3,17 @@
 import type { Foto, Pod } from '../foto';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface EstadoInterfaz {}
+export interface EstadoInterfaz {
+  /** Interruptor de los namespaces del sistema; por defecto ocultos. `kviz-system` nunca se ve. */
+  mostrarSistema?: boolean;
+  /** Filtro por namespace: solo se ven los pods de este namespace. Sin valor, todos. */
+  namespace?: string | null;
+  /**
+   * ids (`pod:<namespace>/<nombre>`) de pods que participan del recorrido y se ven aunque los
+   * filtros los oculten, como el pod del Ingress Controller. Lo completa el recorrido (ticket 17).
+   */
+  podsDelRecorrido?: string[];
+}
 
 export interface Caja {
   x: number;
@@ -53,10 +62,41 @@ export const idPod = (p: Pick<Pod, 'namespace' | 'nombre'>) => `pod:${p.namespac
 
 export const SIN_NODO = 'sin-nodo';
 
-export function construirEscena(foto: Foto, _estado: EstadoInterfaz = {}): Escena {
+/** Namespaces del sistema: ocultos salvo con el interruptor. */
+export const NAMESPACES_DEL_SISTEMA = [
+  'kube-system',
+  'kube-public',
+  'kube-node-lease',
+  'ingress-nginx',
+  'local-path-storage',
+  'kviz-system',
+];
+
+export const esNamespaceDelSistema = (ns: string) => NAMESPACES_DEL_SISTEMA.includes(ns);
+
+/** Donde vive el pod de sondeo de kviz: no es parte del cluster del estudiante. */
+const NAMESPACE_DE_KVIZ = 'kviz-system';
+
+const pasaElInterruptor = (ns: string, estado: EstadoInterfaz) =>
+  ns !== NAMESPACE_DE_KVIZ && (!!estado.mostrarSistema || !esNamespaceDelSistema(ns));
+
+/** Namespaces que ofrece el filtro: los que tienen pods, sin los del sistema mientras están ocultos. */
+export function namespacesDelFiltro(foto: Foto, estado: EstadoInterfaz = {}): string[] {
+  const nombres = new Set(foto.pods.map((p) => p.namespace).filter((ns) => pasaElInterruptor(ns, estado)));
+  return [...nombres].sort();
+}
+
+export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena {
   const M = MEDIDAS;
   const regiones: RegionEnEscena[] = [];
   const pods: PodEnEscena[] = [];
+
+  const delRecorrido = new Set(estado.podsDelRecorrido);
+  const visibles = foto.pods.filter((p) =>
+    delRecorrido.has(idPod(p))
+      ? p.namespace !== NAMESPACE_DE_KVIZ
+      : pasaElInterruptor(p.namespace, estado) && (!estado.namespace || p.namespace === estado.namespace),
+  );
 
   // una región por nodo, lado a lado, y al final "Sin nodo asignado" solo si hace falta
   const grupos = foto.nodos.map((n) => ({
@@ -64,9 +104,9 @@ export function construirEscena(foto: Foto, _estado: EstadoInterfaz = {}): Escen
     nodo: n.nombre as string | null,
     titulo: n.nombre,
     subtitulo: n.internalIP,
-    pods: foto.pods.filter((p) => p.nodo === n.nombre),
+    pods: visibles.filter((p) => p.nodo === n.nombre),
   }));
-  const sinNodo = foto.pods.filter((p) => p.nodo === null);
+  const sinNodo = visibles.filter((p) => p.nodo === null);
   if (sinNodo.length > 0) {
     grupos.push({ id: SIN_NODO, nodo: null, titulo: 'Sin nodo asignado', subtitulo: 'Pending', pods: sinNodo });
   }
