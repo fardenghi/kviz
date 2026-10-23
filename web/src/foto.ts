@@ -23,6 +23,15 @@ export interface Foto {
   ingress: Ingress[];
   /** Ordenadas por id (nodo, puerto y protocolo: el orden del texto, no el numérico). */
   puertas: Puerta[];
+  /** ConfigMaps con su contenido, ordenados por id. Panel de detalle (*). */
+  configMaps?: ConfigMap[];
+  /** Secrets sin valores (solo sus claves), ordenados por id. Panel de detalle (*). */
+  secrets?: Secret[];
+  /**
+   * Events del cluster, ordenados por id (namespace y nombre del Event). Solo los usan la franja
+   * de events y el panel de detalle (*). Ver events.ts.
+   */
+  events?: EventDelCluster[];
   /**
    * Advertencias de configuración, ordenadas por id. El backend la manda siempre; es opcional acá
    * para que los fixtures de la escena no tengan que llevarla.
@@ -51,6 +60,31 @@ export interface Advertencia {
   /** Qué pasa y qué revisar, con los datos del caso. */
   explicacion: string;
   comando: { descripcion: string; comando: string };
+}
+
+/** Un Event de Kubernetes. Espejo de internal/foto/events.go. */
+export interface EventDelCluster {
+  /** `<namespace>/<nombre>` del Event. */
+  id: string;
+  tipo: 'Normal' | 'Warning' | string;
+  motivo: string;
+  mensaje: string;
+  /** El objeto de Kubernetes al que se refiere (involvedObject); namespace "" si no tiene (un nodo). */
+  objeto: { tipo: string; namespace: string; nombre: string };
+  /**
+   * El objeto de la foto al que se refiere: su sección y su id en ella. Los events de un
+   * ReplicaSet o un Job van al workload de arriba. null si el objeto no está en la foto.
+   */
+  enFoto: ObjetoEnFoto | null;
+  /** Última vez que pasó, en RFC 3339 (UTC); "" si no se sabe. */
+  ultimaVez: string;
+  /** Cuántas veces pasó (al menos 1). */
+  veces: number;
+}
+
+export interface ObjetoEnFoto {
+  seccion: 'pods' | 'nodos' | 'services' | 'ingress' | 'workloads';
+  id: string;
 }
 
 export interface Nodo {
@@ -92,6 +126,8 @@ export interface Pod {
   workload: string | null;
   /** Puertos de sus containers que se abren en su nodo. */
   hostPorts: HostPort[];
+  /** Volúmenes del pod, en el orden de spec.volumes. Panel de detalle (*). */
+  volumenes?: Volumen[];
 }
 
 export type TipoDeWorkload = 'Deployment' | 'ReplicaSet' | 'StatefulSet' | 'DaemonSet' | 'Job' | 'CronJob';
@@ -145,6 +181,74 @@ export interface Container {
   ready: boolean;
   started: boolean;
   reinicios: number;
+  /** Variables de entorno con su origen: las de envFrom y después las de env. Panel de detalle (*). */
+  env?: Variable[];
+  /** Volúmenes del pod montados en el container. Panel de detalle (*). */
+  montajes?: Montaje[];
+}
+
+/** De dónde sale una variable de entorno. */
+export type OrigenDeVariable = 'valor' | 'ConfigMap' | 'Secret' | 'DownwardAPI';
+
+/**
+ * Una variable de entorno tal como la ve el proceso: las de env pisan a las de envFrom con el
+ * mismo nombre. Espejo de internal/foto/env.go.
+ */
+export interface Variable {
+  /** "" en un envFrom cuyo ConfigMap o Secret no existe (no se sabe qué claves trae). */
+  nombre: string;
+  origen: OrigenDeVariable;
+  /** El ConfigMap o el Secret, o el campo del Downward API (metadata.name, limits.cpu…); "" en un valor. */
+  fuente: string;
+  /** La clave del ConfigMap o del Secret; "" en los demás orígenes. */
+  clave: string;
+  /**
+   * El valor resuelto. Siempre null si sale de un Secret: se revela a pedido (revelarSecret en
+   * api.ts). También null si falta la fuente o es un campo del Downward API que la foto no resuelve.
+   */
+  valor: string | null;
+  /** Viene de un envFrom (todas las claves de un ConfigMap o Secret). */
+  envFrom: boolean;
+  /** El ConfigMap, el Secret o la clave no existen. */
+  falta: boolean;
+}
+
+/** Un volumen del pod (spec.volumes). */
+export interface Volumen {
+  nombre: string;
+  /** ConfigMap, Secret, emptyDir, hostPath, PersistentVolumeClaim, projected, downwardAPI… u "otro". */
+  tipo: string;
+  /** El ConfigMap, el Secret o el PVC, o la ruta del nodo de un hostPath; "" si no tiene. */
+  fuente: string;
+}
+
+/** Un volumen montado en un container (volumeMounts). */
+export interface Montaje {
+  volumen: string;
+  ruta: string;
+  soloLectura: boolean;
+  /** Archivo o carpeta del volumen que se monta; "" si se monta entero. */
+  subPath: string;
+}
+
+export interface ConfigMap {
+  /** `<namespace>/<nombre>`. */
+  id: string;
+  nombre: string;
+  namespace: string;
+  /** El contenido (data). */
+  datos: Record<string, string>;
+}
+
+/** Un Secret sin valores: solo sus claves. Los valores se revelan a pedido, de a uno. */
+export interface Secret {
+  /** `<namespace>/<nombre>`. */
+  id: string;
+  nombre: string;
+  namespace: string;
+  /** Opaque, kubernetes.io/tls… */
+  tipo: string;
+  claves: string[];
 }
 
 export interface Puerto {

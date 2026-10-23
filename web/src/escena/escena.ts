@@ -222,7 +222,7 @@ const pasaElInterruptor = (ns: string, estado: EstadoInterfaz) =>
   ns !== NAMESPACE_DE_KVIZ && (!!estado.mostrarSistema || !esNamespaceDelSistema(ns));
 
 /** Un namespace se ve si pasa el interruptor del sistema y el filtro por namespace. */
-const seVe = (ns: string, estado: EstadoInterfaz) =>
+export const seVe =(ns: string, estado: EstadoInterfaz) =>
   pasaElInterruptor(ns, estado) && (!estado.namespace || ns === estado.namespace);
 
 /** Opacidad de un pod Terminating: se ve atenuado hasta que desaparece de la foto. */
