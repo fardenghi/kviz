@@ -7,6 +7,8 @@ package api_test
 // configuración de cada probe, las señales usadas y los últimos fallos.
 
 import (
+	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -297,6 +299,28 @@ func TestUnaStartupQueFallaDesdeQueArrancoEstaFallando(t *testing.T) {
 	if startup.Estado != "fallando" || startup.Config.Tipo != "exec" || !reflect.DeepEqual(startup.Config.Comando, []string{"cat", "/tmp/listo"}) ||
 		!reflect.DeepEqual(startup.Senales, []string{"Started: false", "3 fallos (events Unhealthy) desde que arrancó el container"}) {
 		t.Errorf("startup = %s, want fallando, exec cat /tmp/listo, con 3 fallos", mostrar(startup))
+	}
+}
+
+func TestUnFalloDeProbeNuevoLlegaEnVivo(t *testing.T) {
+	p := podBackend()
+	p.Status.ContainerStatuses[0].Ready = false
+	kviz := nuevoKviz(t, "kind-lab", nodo("lab-worker", "172.23.0.4"), p)
+	stream := kviz.abrirStream(t)
+	stream.siguiente(t)
+
+	e := eventDeProbe(p, "application", "Unhealthy", "Readiness probe failed: connection refused", 1, arranque.Add(time.Minute))
+	if _, err := kviz.cliente.CoreV1().Events(e.Namespace).Create(context.Background(), e, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	var got podConSalud
+	c := stream.esperarCambio(t, "pods", "default/backend")
+	if err := json.Unmarshal(c.Valor, &got); err != nil || len(got.Containers) != 1 || len(got.Containers[0].Probes) != 3 {
+		t.Fatalf("cambio = %s (%v), want el pod backend con sus probes", mostrar(c), err)
+	}
+	if r := got.Containers[0].Probes[1]; r.Estado != "fallando" || len(r.Fallos) != 1 {
+		t.Errorf("readiness = %s, want fallando con el fallo nuevo", mostrar(r))
 	}
 }
 

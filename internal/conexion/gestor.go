@@ -22,6 +22,9 @@ type Kubeconfig interface {
 	// Cliente arma un cliente para el contexto. Se pide de nuevo en cada reconexión: un cluster
 	// recreado (kind delete + kind create) vuelve con otra dirección y otros certificados.
 	Cliente(contexto string) (kubernetes.Interface, error)
+	// Metricas arma el cliente de metrics-server (metrics.k8s.io) del contexto. Que el cluster no
+	// tenga metrics-server no es un error acá: lo dice Metricas.Pods.
+	Metricas(contexto string) (Metricas, error)
 }
 
 // ErrContextoInexistente es el error de cambiar a un contexto que no está en el kubeconfig.
@@ -175,7 +178,11 @@ func (g *Gestor) vigilar(ctx context.Context, sesion int, contexto string) {
 func (g *Gestor) mantener(ctx context.Context, sesion int, contexto string, cliente kubernetes.Interface) {
 	ctxConexion, apagar := context.WithCancel(ctx)
 	defer apagar()
-	c := nueva(cliente, contexto, &g.avisos)
+	metricas, err := g.kubeconfig.Metricas(contexto)
+	if err != nil {
+		metricas = nil // sin cliente de metrics-server, la foto dice que no hay métricas
+	}
+	c := nueva(cliente, metricas, g.intervalo, contexto, &g.avisos)
 	sincronizada := make(chan error, 1)
 	go func() { sincronizada <- c.Iniciar(ctxConexion) }()
 

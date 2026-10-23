@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
@@ -32,6 +33,11 @@ import (
 type Conexion struct {
 	contexto string
 	cliente  kubernetes.Interface
+	// metricas es metrics-server del cluster (nil si no se pudo armar su cliente); se vuelve a
+	// medir cada intervalo.
+	metricas  Metricas
+	intervalo time.Duration
+	medicion  medicion
 
 	sincronizada atomic.Bool
 	avisos       *avisos
@@ -49,9 +55,10 @@ type Conexion struct {
 	events       listerscorev1.EventLister
 }
 
-// nueva arma una conexión sobre un cliente ya creado; los cambios de sus objetos avisan a a.
-func nueva(cliente kubernetes.Interface, contexto string, a *avisos) *Conexion {
-	return &Conexion{cliente: cliente, contexto: contexto, avisos: a}
+// nueva arma una conexión sobre un cliente ya creado; los cambios de sus objetos (y del consumo
+// que mide metrics-server, cada intervalo) avisan a a.
+func nueva(cliente kubernetes.Interface, metricas Metricas, intervalo time.Duration, contexto string, a *avisos) *Conexion {
+	return &Conexion{cliente: cliente, metricas: metricas, intervalo: intervalo, contexto: contexto, avisos: a}
 }
 
 // Contexto es el nombre del contexto de kubectl de esta conexión.
@@ -103,6 +110,8 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	if !todos {
 		return fmt.Errorf("no se pudo sincronizar con el cluster %q", c.contexto)
 	}
+	c.medicion.medir(ctx, c.metricas)
+	go c.vigilarMetricas(ctx)
 	c.sincronizada.Store(true)
 	c.avisos.avisar()
 	return nil
@@ -127,6 +136,7 @@ func (c *Conexion) Objetos() foto.Objetos {
 	for _, e := range events {
 		o.Events = append(o.Events, *e)
 	}
+	o.MetricsServer, o.Metricas = c.medicion.ultima()
 	return o
 }
 

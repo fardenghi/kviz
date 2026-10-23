@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -29,6 +30,23 @@ func (kubeconfigDeKubectl) Contextos() (string, []string, error) {
 }
 
 func (kubeconfigDeKubectl) Cliente(contexto string) (kubernetes.Interface, error) {
+	config, err := configDe(contexto)
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(config)
+}
+
+func (kubeconfigDeKubectl) Metricas(contexto string) (Metricas, error) {
+	config, err := configDe(contexto)
+	if err != nil {
+		return nil, err
+	}
+	return metricasDe(config)
+}
+
+// configDe lee del kubeconfig cómo hablarle al cluster del contexto.
+func configDe(contexto string) (*rest.Config, error) {
 	crudo, err := clientcmd.NewDefaultClientConfigLoadingRules().Load()
 	if err != nil {
 		return nil, fmt.Errorf("no se pudo leer el kubeconfig: %w", err)
@@ -36,9 +54,9 @@ func (kubeconfigDeKubectl) Cliente(contexto string) (kubernetes.Interface, error
 	if _, ok := crudo.Contexts[contexto]; !ok {
 		return nil, fmt.Errorf("%w: %q (¿se borró el cluster?)", ErrContextoInexistente, contexto)
 	}
-	rest, err := clientcmd.NewNonInteractiveClientConfig(*crudo, contexto, &clientcmd.ConfigOverrides{}, nil).ClientConfig()
+	config, err := clientcmd.NewNonInteractiveClientConfig(*crudo, contexto, &clientcmd.ConfigOverrides{}, nil).ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("el contexto %q no sirve: %w", contexto, err)
 	}
-	return kubernetes.NewForConfig(rest)
+	return config, nil
 }
