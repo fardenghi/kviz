@@ -1,6 +1,6 @@
 // Escena de la vista de topología (módulo 1 del frontend): función pura de foto + estado de la
 // interfaz a escena. Decide qué se dibuja, dónde y con qué texto; el lienzo solo la pinta.
-import type { Foto, Pod, PuertoService, Service } from '../foto';
+import type { Foto, Ingress, Pod, Puerta, PuertoService, ReglaIngress, Service } from '../foto';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
 export interface EstadoInterfaz {
@@ -51,6 +51,34 @@ export interface ServiceEnEscena extends Caja {
   puertos: string[];
 }
 
+export interface IngressEnEscena extends Caja {
+  /** `ingress:<namespace>/<nombre>`. */
+  id: string;
+  nombre: string;
+  namespace: string;
+  /** La IngressClass, o `sin clase`. */
+  clase: string;
+  /** Un texto por regla: `host/path → service:puerto`, con `⟲ rewrite` si el Ingress reescribe. */
+  reglas: string[];
+}
+
+/** Puerta: pestaña en el borde de arriba de un nodo, para un NodePort o un hostPort. */
+export interface PuertaEnEscena extends Caja {
+  /** `puerta:<nodo>/<puerto>`, con `/<protocolo>` si no es TCP. */
+  id: string;
+  nodo: string;
+  /** id de la región del nodo. */
+  region: string;
+  tipo: Puerta['tipo'];
+  puerto: number;
+  /** `:30010`. */
+  texto: string;
+  /** `NodePort 30010 → backend:80`. */
+  titulo: string;
+  /** id del objeto al que lleva: su Service (NodePort) o su pod (hostPort). */
+  destino: string;
+}
+
 /** Tono de una conexión. En reposo: `reposo`, o `no-listo` hacia un endpoint no listo. */
 export type TonoConexion = 'reposo' | 'no-listo';
 
@@ -77,6 +105,8 @@ export interface Escena {
   regiones: RegionEnEscena[];
   pods: PodEnEscena[];
   services: ServiceEnEscena[];
+  ingress: IngressEnEscena[];
+  puertas: PuertaEnEscena[];
   conexiones: ConexionEnEscena[];
 }
 
@@ -96,10 +126,26 @@ export const MEDIDAS = {
   huecoFilas: 16,
   /** Espacio entre la última fila de Services y los nodos, para las líneas. */
   separacionServices: 70,
+  anchoIngress: 270,
+  /** Alto de un Ingress con una regla; cada regla más suma `altoReglaIngress`. */
+  altoIngress: 60,
+  altoReglaIngress: 14,
+  huecoIngress: 20,
+  /** Espacio entre la última fila de Ingress y la primera de Services, para las líneas. */
+  separacionIngress: 50,
+  anchoPuerta: 62,
+  altoPuerta: 24,
+  /** Distancia entre el comienzo de una puerta y el de la siguiente, de derecha a izquierda. */
+  pasoPuerta: 70,
+  /** Margen derecho de la primera puerta dentro del ancho del nodo. */
+  margenPuerta: 20,
+  /** Distancia entre filas de puertas, cuando no entran en una. */
+  pasoFilaPuerta: 30,
 } as const;
 
 export const idPod = (p: Pick<Pod, 'namespace' | 'nombre'>) => `pod:${p.namespace}/${p.nombre}`;
 export const idService = (s: Pick<Service, 'namespace' | 'nombre'>) => `service:${s.namespace}/${s.nombre}`;
+export const idIngress = (i: Pick<Ingress, 'namespace' | 'nombre'>) => `ingress:${i.namespace}/${i.nombre}`;
 
 export const SIN_NODO = 'sin-nodo';
 
@@ -186,18 +232,171 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
     Math.max(0, ...regiones.map((r) => r.x + r.ancho)),
   );
 
-  // los nodos bajan para dejar arriba las filas de Services
-  if (services.length > 0) {
-    const bajar = Math.max(...services.map((s) => s.y + s.alto)) + M.separacionServices;
-    for (const c of [...regiones, ...pods]) c.y += bajar;
+  const ingressVisibles = foto.ingress.filter((i) => seVe(i.namespace, estado));
+  const ingress = ubicarIngress(
+    ingressVisibles,
+    services,
+    Math.max(0, ...[...regiones, ...services].map((c) => c.x + c.ancho)),
+  );
+
+  // los Services bajan para dejar arriba las filas de Ingress
+  if (ingress.length > 0) {
+    const bajar = Math.max(...ingress.map((i) => i.y + i.alto)) + M.separacionIngress;
+    for (const s of services) s.y += bajar;
   }
 
-  const conexiones = conexionesServicePod(foto.services, services, pods);
+  // las puertas de cada nodo, de derecha a izquierda; si no entran en una fila, suben a otra
+  const puertasPorNodo = new Map<string, Puerta[]>();
+  for (const p of foto.puertas.filter((p) => seVePuerta(p, estado, delRecorrido))) {
+    puertasPorNodo.set(p.nodo, [...(puertasPorNodo.get(p.nodo) ?? []), p]);
+  }
+  const porFila = Math.max(1, Math.floor((anchoRegion - M.margenPuerta - M.anchoPuerta) / M.pasoPuerta) + 1);
+  const filasDePuertas = Math.max(0, ...[...puertasPorNodo.values()].map((ps) => Math.ceil(ps.length / porFila)));
+  const filasExtra = Math.max(0, filasDePuertas - 1) * M.pasoFilaPuerta;
 
-  const cajas: Caja[] = [...regiones, ...services];
+  // los nodos bajan para dejar arriba las filas de Ingress y Services, y lugar para las puertas
+  const arriba = [...ingress, ...services];
+  const bajar = Math.max(
+    arriba.length > 0 ? Math.max(...arriba.map((c) => c.y + c.alto)) + M.separacionServices + filasExtra : 0,
+    filasDePuertas > 0 ? M.altoPuerta / 2 + filasExtra : 0,
+  );
+  for (const c of [...regiones, ...pods]) c.y += bajar;
+
+  const puertas = regiones.flatMap((r) =>
+    (r.nodo === null ? [] : (puertasPorNodo.get(r.nodo) ?? [])).map((p, i) => ({
+      id: idPuerta(p),
+      nodo: p.nodo,
+      region: r.id,
+      tipo: p.tipo,
+      puerto: p.puerto,
+      texto: `:${p.puerto}` + (p.protocolo !== 'TCP' ? `/${p.protocolo}` : ''),
+      titulo: `${p.tipo} ${p.puerto} → ${p.service ?? p.pod}:${p.haciaPuerto}`,
+      destino: p.service !== null ? idService({ namespace: p.namespace, nombre: p.service }) : idPod({ namespace: p.namespace, nombre: p.pod! }),
+      x: r.x + r.ancho - M.margenPuerta - ((i % porFila) + 1) * M.pasoPuerta + (M.pasoPuerta - M.anchoPuerta),
+      y: r.y - M.altoPuerta / 2 - Math.floor(i / porFila) * M.pasoFilaPuerta,
+      ancho: M.anchoPuerta,
+      alto: M.altoPuerta,
+    })),
+  );
+
+  const conexiones = [
+    ...conexionesIngressService(ingressVisibles, ingress, services),
+    ...conexionesServicePod(foto.services, services, pods),
+  ];
+
+  const cajas: Caja[] = [...regiones, ...ingress, ...services];
   const ancho = Math.max(0, ...cajas.map((c) => c.x + c.ancho));
   const alto = Math.max(0, ...cajas.map((c) => c.y + c.alto));
-  return { ancho, alto, regiones, pods, services, conexiones };
+  return { ancho, alto, regiones, pods, services, ingress, puertas, conexiones };
+}
+
+export const idPuerta = (p: Pick<Puerta, 'nodo' | 'puerto' | 'protocolo'>) =>
+  `puerta:${p.nodo}/${p.puerto}` + (p.protocolo !== 'TCP' ? `/${p.protocolo}` : '');
+
+/**
+ * Una puerta NodePort se ve si se ve su Service. Una de hostPort es del nodo: se ve aunque los
+ * namespaces del sistema estén ocultos (el hostPort del Ingress Controller es la entrada al
+ * cluster), pero respeta el filtro por namespace. Las de kviz-system no se ven nunca.
+ */
+function seVePuerta(p: Puerta, estado: EstadoInterfaz, delRecorrido: Set<string>): boolean {
+  if (p.tipo === 'NodePort') return seVe(p.namespace, estado);
+  if (p.namespace === NAMESPACE_DE_KVIZ) return false;
+  return !estado.namespace || p.namespace === estado.namespace || delRecorrido.has(idPod({ namespace: p.namespace, nombre: p.pod! }));
+}
+
+/** Services de la escena a los que manda un Ingress (los de sus reglas, en su namespace), sin repetir. */
+const servicesDe = (i: Ingress, porId: Map<string, ServiceEnEscena>) => [
+  ...new Set(
+    i.reglas.flatMap((r) => {
+      const s = porId.get(idService({ namespace: i.namespace, nombre: r.service }));
+      return s ? [s] : [];
+    }),
+  ),
+];
+
+/**
+ * Cada Ingress va arriba del centro de sus Services. Si se pisa con uno ya ubicado, baja a la fila
+ * siguiente. Los Ingress sin Services en la escena van a la derecha de todo, en la primera fila.
+ * Las filas empiezan en y = 0 y cada una es tan alta como su Ingress más alto.
+ */
+function ubicarIngress(visibles: Ingress[], services: ServiceEnEscena[], finEscena: number): IngressEnEscena[] {
+  const M = MEDIDAS;
+  const porId = new Map(services.map((s) => [s.id, s]));
+  const filas: IngressEnEscena[][] = [];
+  const libre = (fila: number, x: number) =>
+    (filas[fila] ?? []).every((o) => x + M.anchoIngress + M.huecoIngress <= o.x || x >= o.x + o.ancho + M.huecoIngress);
+
+  const conCentro = visibles.map((i) => {
+    const suyos = servicesDe(i, porId);
+    const centro = suyos.length ? suyos.reduce((t, s) => t + s.x + s.ancho / 2, 0) / suyos.length : null;
+    return { i, centro };
+  });
+  const conServices = conCentro.filter((c) => c.centro !== null).sort((a, b) => a.centro! - b.centro!);
+  const sinServices = conCentro.filter((c) => c.centro === null);
+
+  const poner = (i: Ingress, x: number, fila: number) => {
+    const reglas = i.reglas.length ? i.reglas.map((r) => textoRegla(r, i.rewrite)) : ['sin reglas'];
+    (filas[fila] ??= []).push({
+      id: idIngress(i),
+      nombre: i.nombre,
+      namespace: i.namespace,
+      clase: i.clase ?? 'sin clase',
+      reglas,
+      x,
+      y: 0,
+      ancho: M.anchoIngress,
+      alto: M.altoIngress + (reglas.length - 1) * M.altoReglaIngress,
+    });
+  };
+
+  for (const { i, centro } of conServices) {
+    const x = Math.max(0, centro! - M.anchoIngress / 2);
+    let fila = 0;
+    while (!libre(fila, x)) fila++;
+    poner(i, x, fila);
+  }
+  let x = Math.max(
+    finEscena > 0 ? finEscena + M.huecoIngress : 0,
+    ...filas.flat().map((u) => u.x + u.ancho + M.huecoIngress),
+  );
+  for (const { i } of sinServices) {
+    poner(i, x, 0);
+    x += M.anchoIngress + M.huecoIngress;
+  }
+
+  let y = 0;
+  for (const fila of filas) {
+    for (const i of fila) i.y = y;
+    y += Math.max(...fila.map((i) => i.alto)) + M.huecoFilas;
+  }
+  return filas.flat();
+}
+
+/** `host/path → service:puerto ⟲ rewrite`; el backend por defecto (sin host ni path) dice `(por defecto)`. */
+function textoRegla(r: ReglaIngress, rewrite: string | null): string {
+  const desde = r.host + r.path || '(por defecto)';
+  return `${desde} → ${r.service}:${r.puerto}` + (rewrite && r.path ? ` ⟲ ${rewrite}` : '');
+}
+
+/** Una línea de cada Ingress a cada Service distinto de sus reglas. */
+function conexionesIngressService(
+  visibles: Ingress[],
+  ingress: IngressEnEscena[],
+  services: ServiceEnEscena[],
+): ConexionEnEscena[] {
+  const enEscena = new Map(ingress.map((i) => [i.id, i]));
+  const porId = new Map(services.map((s) => [s.id, s]));
+  return visibles.flatMap((i) => {
+    const caja = enEscena.get(idIngress(i))!;
+    return servicesDe(i, porId).map((s) => ({
+      id: `${caja.id}->${s.id}`,
+      desde: caja.id,
+      hasta: s.id,
+      tono: 'reposo' as const,
+      inicio: { x: caja.x + caja.ancho / 2, y: caja.y + caja.alto },
+      fin: { x: s.x + s.ancho / 2, y: s.y },
+    }));
+  });
 }
 
 /** Pods de la escena detrás de los endpoints de un Service (listos y no listos). */

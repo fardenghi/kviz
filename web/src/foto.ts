@@ -14,6 +14,10 @@ export interface Foto {
   pods: Pod[];
   /** Ordenados por namespace y nombre. */
   services: Service[];
+  /** Ordenados por namespace y nombre. */
+  ingress: Ingress[];
+  /** Ordenadas por nodo, con las NodePort primero, y por puerto. */
+  puertas: Puerta[];
 }
 
 export interface Nodo {
@@ -30,6 +34,16 @@ export interface Pod {
   ip: string | null;
   /** status.phase: Pending, Running, Succeeded, Failed o Unknown. */
   fase: string;
+  /** Puertos de sus containers que se abren en su nodo. */
+  hostPorts: HostPort[];
+}
+
+export interface HostPort {
+  /** El hostPort: el número que se abre en el nodo. */
+  puerto: number;
+  protocolo: string;
+  container: string;
+  containerPort: number;
 }
 
 export interface Service {
@@ -62,4 +76,46 @@ export interface Endpoint {
   nodo: string | null;
   /** conditions.ready de la EndpointSlice. */
   listo: boolean;
+}
+
+export interface Ingress {
+  nombre: string;
+  namespace: string;
+  /** spec.ingressClassName (o la anotación vieja kubernetes.io/ingress.class); null si no tiene. */
+  clase: string | null;
+  /** Anotación nginx.ingress.kubernetes.io/rewrite-target; vale para todas las reglas. */
+  rewrite: string | null;
+  /** En el orden del Ingress; el backend por defecto, si hay, va al final sin host ni path. */
+  reglas: ReglaIngress[];
+}
+
+export interface ReglaIngress {
+  /** "" si la regla vale para cualquier host. */
+  host: string;
+  path: string;
+  /** Exact, Prefix o ImplementationSpecific; "" en el backend por defecto. */
+  tipoPath: string;
+  /** Service destino, en el namespace del Ingress. */
+  service: string;
+  /** Puerto del Service: número, o el nombre de un puerto del Service. */
+  puerto: number | string;
+}
+
+/**
+ * Puerto abierto en un nodo hacia el cluster: un NodePort (una puerta en cada nodo) o un hostPort
+ * (una puerta solo en el nodo de su pod).
+ */
+export interface Puerta {
+  nodo: string;
+  puerto: number;
+  protocolo: string;
+  tipo: 'NodePort' | 'hostPort';
+  /** Namespace del Service o del pod al que lleva. */
+  namespace: string;
+  /** Service al que lleva una puerta NodePort; null en las de hostPort. */
+  service: string | null;
+  /** Pod al que lleva una puerta de hostPort; null en las NodePort. */
+  pod: string | null;
+  /** Puerto del Service (NodePort) o del container (hostPort) al que llega. */
+  haciaPuerto: number;
 }
