@@ -1,7 +1,7 @@
 // Advertencias de configuración en la escena: cada pod, Service o Ingress lleva los títulos de sus
 // advertencias, que el lienzo dibuja como una marca roja. Las calcula el backend (viajan en la foto).
 import type { Advertencia, Foto } from '../foto';
-import { idIngress, idPod, idService } from './escena';
+import { idIngress, idPod, idService } from './ids';
 
 /** id de escena del objeto de una advertencia. */
 export function idDeAdvertencia(a: Pick<Advertencia, 'tipo' | 'namespace' | 'nombre'>): string {

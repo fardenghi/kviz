@@ -8,6 +8,7 @@ import { aplicarRecorrido, podsDelIngressController } from './recorrido';
 import type { Recorrido, Reparto } from '../prueba';
 import { aplicarReparto } from './reparto';
 import { advertenciasPorObjeto, titulosDe } from './advertencias';
+import { idIngress, idNodo, idPod, idPuerta, idService } from './ids';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
 export interface EstadoInterfaz {
@@ -240,10 +241,6 @@ export const MEDIDAS = {
   pasoFilaPuerta: 30,
 } as const;
 
-export const idPod = (p: Pick<Pod, 'namespace' | 'nombre'>) => `pod:${p.namespace}/${p.nombre}`;
-export const idService = (s: Pick<Service, 'namespace' | 'nombre'>) => `service:${s.namespace}/${s.nombre}`;
-export const idIngress = (i: Pick<Ingress, 'namespace' | 'nombre'>) => `ingress:${i.namespace}/${i.nombre}`;
-
 export const SIN_NODO = 'sin-nodo';
 
 /** Namespaces del sistema: ocultos salvo con el interruptor. */
@@ -310,7 +307,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
 
   // una región por nodo, lado a lado, y al final "Sin nodo asignado" solo si hace falta
   const grupos = foto.nodos.map((n) => ({
-    id: `nodo:${n.nombre}`,
+    id: idNodo(n.nombre),
     nodo: n.nombre as string | null,
     titulo: n.nombre,
     subtitulo: n.internalIP,
@@ -434,9 +431,6 @@ const ordenPuertas = (a: Puerta, b: Puerta) =>
   Number(b.tipo === 'NodePort') - Number(a.tipo === 'NodePort') ||
   a.puerto - b.puerto ||
   (a.protocolo < b.protocolo ? -1 : a.protocolo > b.protocolo ? 1 : 0);
-
-export const idPuerta = (p: Pick<Puerta, 'nodo' | 'puerto' | 'protocolo'>) =>
-  `puerta:${p.nodo}/${p.puerto}` + (p.protocolo !== 'TCP' ? `/${p.protocolo}` : '');
 
 /**
  * Una puerta NodePort se ve si se ve su Service. Una de hostPort es del nodo: se ve aunque los

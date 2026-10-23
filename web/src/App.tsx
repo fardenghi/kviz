@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cambiarContexto, escucharFoto, pedirContextos } from './api';
 import { construirEscena, namespacesDelFiltro, workloadsVisibles } from './escena/escena';
-import { detalleDe, idDeWorkload } from './detalle/detalle';
+import { detalleDe } from './detalle/detalle';
+import { idWorkload, partirId } from './escena/ids';
 import { PanelDeDetalle } from './detalle/PanelDeDetalle';
 import { Lienzo } from './lienzo/Lienzo';
 import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
@@ -126,11 +127,14 @@ export function App() {
   // elegir un workload en la lista lo resalta y lo abre en el panel; deselegirlo cierra su panel
   const elegirWorkload = (id: string | null) => {
     setWorkload(id);
-    if (id) setSeleccionado(idDeWorkload({ id }));
-    else setSeleccionado((s) => (s?.startsWith('workload:') ? null : s));
+    if (id) setSeleccionado(idWorkload({ id }));
+    else setSeleccionado((s) => (s && partirId(s).tipo === 'workload' ? null : s));
   };
   // un objeto abierto desde el panel (el nodo de un pod, su workload…); un workload, además, se resalta
-  const abrir = (id: string) => (id.startsWith('workload:') ? elegirWorkload(id.slice('workload:'.length)) : setSeleccionado(id));
+  const abrir = (id: string) => {
+    const { tipo, resto } = partirId(id);
+    return tipo === 'workload' ? elegirWorkload(resto) : setSeleccionado(id);
+  };
 
   return (
     <div className="app">

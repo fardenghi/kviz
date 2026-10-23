@@ -1,7 +1,7 @@
 // Pod: namespace, labels, nodo, IP, edad, estado y workload.
 import { useEffect, useState } from 'react';
 import { etiquetaDeWorkload } from '../../escena/workloads';
-import { edad, idDeNodo, idDeWorkload, paresClaveValor, type PropsDeSeccion } from '../detalle';
+import { edad, idNodo, idWorkload, paresClaveValor, type PropsDeSeccion } from '../detalle';
 import { Datos, Enlace, Nada, Pares, Seccion } from '../ui';
 
 export const orden = 10;
@@ -17,14 +17,14 @@ export default function DatosDelPod({ detalle, foto, abrir }: PropsDeSeccion) {
       <Datos
         filas={[
           ['namespace', p.namespace],
-          ['nodo', p.nodo ? <Enlace id={idDeNodo(p.nodo)} abrir={abrir}>{p.nodo}</Enlace> : <Nada>sin nodo asignado</Nada>],
+          ['nodo', p.nodo ? <Enlace id={idNodo(p.nodo)} abrir={abrir}>{p.nodo}</Enlace> : <Nada>sin nodo asignado</Nada>],
           ['IP', p.ip ? <span className="mono-texto">{p.ip}</span> : <Nada>sin IP</Nada>],
           ['estado', p.estado === p.fase ? p.estado : `${p.estado} (fase ${p.fase})`],
           ['edad', anios || null],
           [
             'workload',
             w ? (
-              <Enlace id={idDeWorkload(w)} abrir={abrir}>
+              <Enlace id={idWorkload(w)} abrir={abrir}>
                 {etiquetaDeWorkload(w)}
               </Enlace>
             ) : (

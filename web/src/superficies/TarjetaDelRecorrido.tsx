@@ -2,6 +2,7 @@
 // respuesta y los pasos numerados como en la vista; si la request se repitió, las barras del
 // reparto. Un clic en un paso resalta solo ese paso en la vista; otro clic (o "todos los pasos")
 // vuelve a mostrarlos todos. Cerrarla termina el recorrido y el foco vuelve.
+import { nsNombre } from '../escena/ids';
 import { lineaDelPedido, type Prueba, type Reparto } from '../prueba';
 import { PastillaDelResultado } from './FormularioDePrueba';
 
@@ -77,7 +78,7 @@ function BarrasDeReparto({ reparto: r }: { reparto: Reparto }) {
     <div>
       <b>Reparto</b> <span className="tenue-texto chica">· {r.total} requests</span>
       <ul className="barras-reparto">
-        {r.pods.map((p) => fila(p.pod, p.pod.slice(p.pod.indexOf('/') + 1), p.n))}
+        {r.pods.map((p) => fila(p.pod, nsNombre(p.pod).nombre, p.n))}
         {r.sinIdentificar > 0 && fila('?', 'pod sin identificar', r.sinIdentificar, true)}
         {r.sinRespuesta > 0 && fila('✕', 'sin respuesta', r.sinRespuesta, true)}
       </ul>

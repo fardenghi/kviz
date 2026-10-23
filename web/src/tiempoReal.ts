@@ -1,7 +1,7 @@
 // Tiempo real: arma la foto con los mensajes del canal de streaming (GET /api/stream) y recuerda
 // qué pods acaban de aparecer, para que brillen unas pocas veces. Es pura: el tiempo entra como
 // argumento.
-import { idPod } from './escena/escena';
+import { idPod } from './escena/ids';
 import type { Foto } from './foto';
 
 /** Un mensaje del stream. Espejo de internal/api/stream.go; el canal admite más tipos. */

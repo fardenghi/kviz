@@ -7,7 +7,8 @@
 import type { Foto } from '../foto';
 import type { Paso, Recorrido, RefObjeto } from '../prueba';
 import type { Caja, Escena, EstadoInterfaz, MarcasDeFoco, MarcasDeRecorrido, Punto, SaltoEnEscena } from './escena';
-import { idIngress, idPod, idPuerta, idService, OPACIDAD_TERMINANDO } from './escena';
+import { OPACIDAD_TERMINANDO } from './escena';
+import { idIngress, idNodo, idPod, idPodDeLaFoto, idPuerta, idService, nsNombre } from './ids';
 import { lineasDePuerta } from './foco';
 import { OPACIDAD_ATENUADO } from './workloads';
 
@@ -16,10 +17,6 @@ export const hayRecorrido = (estado: EstadoInterfaz): boolean => (estado.recorri
 
 /** id de escena del objeto de la foto que marca un paso; null si no es algo que la escena dibuja. */
 export function idEnEscena(foto: Foto, ref: RefObjeto): string | null {
-  const nsNombre = (id: string) => {
-    const corte = id.indexOf('/');
-    return { namespace: id.slice(0, corte), nombre: id.slice(corte + 1) };
-  };
   switch (ref.tipo) {
     case 'service':
       return idService(nsNombre(ref.id));
@@ -32,7 +29,7 @@ export function idEnEscena(foto: Foto, ref: RefObjeto): string | null {
       return p ? idPuerta(p) : null;
     }
     case 'nodo':
-      return `nodo:${ref.id}`;
+      return idNodo(ref.id);
   }
   return null;
 }
@@ -45,10 +42,7 @@ export function podsDelIngressController(recorrido: Recorrido | null | undefined
   return (recorrido?.pasos ?? [])
     .filter((p) => p.tipo === 'ingress')
     .flatMap((p) => p.objetos.filter((o) => o.tipo === 'pod'))
-    .map((o) => {
-      const corte = o.id.indexOf('/');
-      return idPod({ namespace: o.id.slice(0, corte), nombre: o.id.slice(corte + 1) });
-    });
+    .map((o) => idPodDeLaFoto(o.id));
 }
 
 /** Los pasos que se marcan: el elegido, si es uno del recorrido, o todos. */
@@ -134,7 +128,7 @@ function saltosDe(escena: Escena, foto: Foto, recorrido: Recorrido): SaltoEnEsce
 
   return recorrido.pasos.flatMap((paso) => {
     if (paso.tipo !== 'salto' || paso.objetos.length < 2) return [];
-    const [de, a] = paso.objetos.map((o) => regiones.get(`nodo:${o.id}`));
+    const [de, a] = paso.objetos.map((o) => regiones.get(idNodo(o.id)));
     if (!de || !a) return [];
     const desde = abajo(delPaso('ingress', de.id) ?? delPaso('puerta', de.id) ?? de);
     const hasta = abajo(delPaso('pod', a.id) ?? a);

@@ -2,6 +2,7 @@
 // selecciona. Sus relacionados se calculan sobre la escena ya ubicada (conexiones y destinos de
 // puertas), así solo cuentan los objetos que se ven.
 import type { ConexionEnEscena, Escena, EstadoInterfaz, MarcasDeFoco, TonoConexion } from './escena';
+import { partirId } from './ids';
 import { hayRecorrido } from './recorrido';
 
 /** Opacidad de los objetos sin relación con el foco mientras hay un objeto apuntado. */
@@ -10,7 +11,7 @@ export const OPACIDAD_ACLARADO = 0.45;
 /** Solo estos objetos toman foco: seleccionar un nodo o un workload no es foco. */
 const TIPOS_CON_FOCO = ['service', 'pod', 'ingress', 'puerta'];
 
-const tipoDe = (id: string) => id.slice(0, id.indexOf(':'));
+const tipoDe = (id: string) => partirId(id).tipo;
 
 /**
  * El foco: el objeto apuntado manda sobre la selección. Un id que no está en la escena no es foco. Mientras

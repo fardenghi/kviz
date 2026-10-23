@@ -1,8 +1,8 @@
 // Panel de detalle: qué objeto de la foto muestra. El objeto seleccionado se identifica con su id
-// de escena (`pod:<ns>/<nombre>`, `service:…`, `ingress:…`, `nodo:<nombre>`, ver escena.ts), y un
-// workload de la lista con `workload:<id del workload>`. Es la misma selección que da el foco.
+// de escena (`pod:<ns>/<nombre>`, `service:…`, `ingress:…`, `nodo:<nombre>`, y un workload de la
+// lista con `workload:<id del workload>`; ver escena/ids.ts). Es la misma selección que da el foco.
 import type { Foto, Ingress, Nodo, Pod, Service, Workload } from '../foto';
-import { idIngress, idPod, idService } from '../escena/escena';
+import { partirId } from '../escena/ids';
 
 /** El objeto que muestra el panel, ya buscado en la foto. */
 export type Detalle =
@@ -22,15 +22,11 @@ export interface PropsDeSeccion {
   probar?: (destino: string) => void;
 }
 
-export const idDeWorkload = (w: Pick<Workload, 'id'>) => `workload:${w.id}`;
-export const idDeNodo = (nombre: string) => `nodo:${nombre}`;
-export { idIngress, idPod, idService };
+export { idIngress, idNodo, idPod, idService, idWorkload } from '../escena/ids';
 
 /** Busca en la foto el objeto seleccionado; null si no es un objeto con panel o ya no está. */
 export function detalleDe(foto: Foto, id: string): Detalle | null {
-  const corte = id.indexOf(':');
-  const tipo = id.slice(0, corte);
-  const resto = id.slice(corte + 1);
+  const { tipo, resto } = partirId(id);
   const porNsNombre = <T extends { namespace: string; nombre: string }>(lista: T[]) =>
     lista.find((o) => `${o.namespace}/${o.nombre}` === resto);
   switch (tipo) {
