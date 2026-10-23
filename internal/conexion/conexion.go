@@ -52,6 +52,8 @@ type Conexion struct {
 	services     listerscorev1.ServiceLister
 	slices       listersdiscoveryv1.EndpointSliceLister
 	ingress      listersnetworkingv1.IngressLister
+	configMaps   listerscorev1.ConfigMapLister
+	secrets      listerscorev1.SecretLister
 	events       listerscorev1.EventLister
 }
 
@@ -79,6 +81,8 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	c.slices = slices.Lister()
 	ingress := fabrica.Networking().V1().Ingresses()
 	c.ingress = ingress.Lister()
+	configMaps, secrets := fabrica.Core().V1().ConfigMaps(), fabrica.Core().V1().Secrets()
+	c.configMaps, c.secrets = configMaps.Lister(), secrets.Lister()
 	events := fabrica.Core().V1().Events()
 	c.events = events.Lister()
 	apps, batch := fabrica.Apps().V1(), fabrica.Batch().V1()
@@ -94,6 +98,7 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 		nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(), ingress.Informer(),
 		apps.Deployments().Informer(), apps.ReplicaSets().Informer(), apps.StatefulSets().Informer(),
 		apps.DaemonSets().Informer(), batch.Jobs().Informer(), batch.CronJobs().Informer(),
+		configMaps.Informer(), secrets.Informer(),
 		events.Informer(),
 	} {
 		if _, err := inf.AddEventHandler(c.avisos.alCambiar()); err != nil {
@@ -132,6 +137,8 @@ func (c *Conexion) Objetos() foto.Objetos {
 	o.DaemonSets, _ = c.daemonSets.List(labels.Everything())
 	o.Jobs, _ = c.jobs.List(labels.Everything())
 	o.CronJobs, _ = c.cronJobs.List(labels.Everything())
+	o.ConfigMaps, _ = c.configMaps.List(labels.Everything())
+	o.Secrets, _ = c.secrets.List(labels.Everything())
 	events, _ := c.events.List(labels.Everything())
 	for _, e := range events {
 		o.Events = append(o.Events, *e)

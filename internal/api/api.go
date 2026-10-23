@@ -11,6 +11,7 @@
 //	                logs de un container por Server-Sent Events: en vivo o del reinicio anterior (ver logs.go)
 //	GET /api/comandos?tipo=Pod&namespace=default&nombre=nginx
 //	                comandos sugeridos de un objeto de la foto (ver internal/comandos); 404 si no está
+//	POST /api/secreto    revela el valor de una clave de un Secret: {"namespace", "nombre", "clave"} → {"valor"} (ver secreto.go)
 //	GET /           la interfaz compilada (web/dist)
 package api
 
@@ -34,6 +35,9 @@ type Cluster interface {
 	Contextos() (actual string, todos []string, err error)
 	// CambiarContexto se conecta en caliente al cluster de otro contexto.
 	CambiarContexto(contexto string) error
+	// ValorDeSecret revela el valor de una clave de un Secret (conexion.ErrSecretInexistente si
+	// no existe). Es el único camino por el que un valor de Secret sale de kviz.
+	ValorDeSecret(namespace, nombre, clave string) (string, error)
 	// Logs abre los logs de un container: los actuales, que siguen en vivo hasta que se cancela
 	// ctx, o los del reinicio anterior.
 	Logs(ctx context.Context, p conexion.PedidoDeLogs) (io.ReadCloser, error)
@@ -48,6 +52,7 @@ func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/stream", transmitirFoto(cluster))
 	mux.HandleFunc("GET /api/contextos", listarContextos(cluster))
 	mux.HandleFunc("POST /api/contexto", cambiarContexto(cluster))
+	mux.HandleFunc("POST /api/secreto", revelarSecret(cluster))
 	mux.HandleFunc("GET /api/logs", transmitirLogs(cluster))
 	mux.HandleFunc("GET /api/comandos", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()

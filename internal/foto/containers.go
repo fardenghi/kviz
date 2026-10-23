@@ -30,6 +30,10 @@ type Container struct {
 	Probes []Probe `json:"probes"`
 	// Recursos son los requests y limits de CPU y memoria, con el consumo (ver recursos.go).
 	Recursos Recursos `json:"recursos"`
+	// Env son sus variables de entorno con su origen (ver env.go).
+	Env []Variable `json:"env"`
+	// Montajes son los volúmenes del pod montados en el container (ver volumenes.go).
+	Montajes []Montaje `json:"montajes"`
 }
 
 type Puerto struct {
