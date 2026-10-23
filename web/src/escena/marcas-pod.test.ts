@@ -30,6 +30,7 @@ const foto = (...pods: Pod[]): Foto => ({
   conectado: true,
   nodos: [{ nombre: 'lab-worker', internalIP: '172.23.0.4' }],
   pods,
+  services: [],
 });
 const tarjeta = (escena: { pods: PodEnEscena[] }, nombre: string) => escena.pods.find((p) => p.nombre === nombre)!;
 
@@ -196,6 +197,28 @@ describe('containers como chips', () => {
     expect(b.y).toBe(a.y);
     expect(b.x).toBeGreaterThan(a.x + a.ancho);
     expect(c.x).toBeGreaterThan(b.x + b.ancho);
+  });
+
+  it('los chips siguen dentro de la tarjeta cuando los Services bajan los nodos', () => {
+    const conService: Foto = {
+      ...foto(pod('backend-79f9ffc666-k2x8p', { containers: [container('application', { puertos: [puerto(8081)] })] })),
+      services: [
+        {
+          nombre: 'backend',
+          namespace: 'default',
+          tipo: 'NodePort',
+          clusterIP: '10.96.11.121',
+          puertos: [{ nombre: '', protocolo: 'TCP', puerto: 80, targetPort: 8081, nodePort: 30010 }],
+          selector: { app: 'backend' },
+          endpoints: [{ ip: '10.244.1.5', pod: 'backend-79f9ffc666-k2x8p', nodo: 'lab-worker', listo: true }],
+        },
+      ],
+    };
+    const escena = construirEscena(conService);
+
+    const t = tarjeta(escena, 'backend-79f9ffc666-k2x8p');
+    expect(t.y).toBeGreaterThan(0);
+    expect(adentro(t.containers[0], t)).toBe(true);
   });
 
   it('si no entran todos, el último chip dice cuántos faltan', () => {

@@ -2,7 +2,7 @@
 // estado de interfaz y se revisa la escena, sin navegador.
 import { describe, expect, it } from 'vitest';
 import type { Foto, Pod } from '../foto';
-import { type Caja, construirEscena } from './escena';
+import { type Caja, construirEscena, namespacesDelFiltro } from './escena';
 
 const nodo = (nombre: string, internalIP: string) => ({ nombre, internalIP });
 const pod = (nombre: string, nodo: string | null, ip: string | null = '10.244.0.1'): Pod => ({
@@ -14,7 +14,7 @@ const pod = (nombre: string, nodo: string | null, ip: string | null = '10.244.0.
   estado: nodo ? 'Running' : 'Pending',
   containers: [],
 });
-const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], ...parte });
+const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], services: [], ...parte });
 
 describe('regiones de nodo', () => {
   it('ubica los nodos lado a lado, en el orden de la foto y sin pisarse', () => {
@@ -113,5 +113,78 @@ describe('tamaño de la escena', () => {
   });
 });
 
-const adentro = (c: Caja, region: Caja) =>
+describe('filtros de namespace', () => {
+  const lab = () =>
+    foto({
+      nodos: [nodo('lab-control-plane', '172.23.0.2'), nodo('lab-worker', '172.23.0.4'), nodo('lab-worker2', '172.23.0.3')],
+      pods: [
+        podEn('kube-system', 'coredns-7db6d8ff4d-x2v9q', 'lab-control-plane'),
+        podEn('kube-system', 'kube-proxy-4hk2m', 'lab-worker'),
+        podEn('ingress-nginx', 'ingress-nginx-controller-5c9f8', 'lab-worker2'),
+        podEn('local-path-storage', 'local-path-provisioner-6f8956', 'lab-control-plane'),
+        podEn('kviz-system', 'kviz-sondeo', 'lab-worker'),
+        podEn('default', 'backend-79f9ffc666-k2x8p', 'lab-worker'),
+        podEn('default', 'nginx', 'lab-worker'),
+        podEn('datos', 'db-0', 'lab-worker2'),
+      ],
+    });
+  const nombres = (e: ReturnType<typeof construirEscena>) => e.pods.map((p) => p.nombre).sort();
+
+  it('oculta por defecto los pods de los namespaces del sistema', () => {
+    const escena = construirEscena(lab());
+
+    expect(nombres(escena)).toEqual(['backend-79f9ffc666-k2x8p', 'db-0', 'nginx']);
+  });
+
+  it('con el interruptor muestra los namespaces del sistema, salvo kviz-system', () => {
+    const escena = construirEscena(lab(), { mostrarSistema: true });
+
+    expect(nombres(escena)).toEqual([
+      'backend-79f9ffc666-k2x8p',
+      'coredns-7db6d8ff4d-x2v9q',
+      'db-0',
+      'ingress-nginx-controller-5c9f8',
+      'kube-proxy-4hk2m',
+      'local-path-provisioner-6f8956',
+      'nginx',
+    ]);
+  });
+
+  it('el filtro por namespace deja solo los pods de ese namespace', () => {
+    const escena = construirEscena(lab(), { namespace: 'datos' });
+
+    expect(nombres(escena)).toEqual(['db-0']);
+    // los nodos siguen todos, aunque queden vacíos
+    expect(escena.regiones.map((r) => r.nodo)).toEqual(['lab-control-plane', 'lab-worker', 'lab-worker2']);
+  });
+
+  it('el filtro ofrece los namespaces con pods, sin los del sistema mientras están ocultos', () => {
+    expect(namespacesDelFiltro(lab(), {})).toEqual(['datos', 'default']);
+    expect(namespacesDelFiltro(lab(), { namespace: 'datos' })).toEqual(['datos', 'default']);
+    expect(namespacesDelFiltro(lab(), { mostrarSistema: true })).toEqual([
+      'datos',
+      'default',
+      'ingress-nginx',
+      'kube-system',
+      'local-path-storage',
+    ]);
+  });
+
+  it('un pod del recorrido se ve aunque los filtros lo oculten, salvo en kviz-system', () => {
+    const ic = 'pod:ingress-nginx/ingress-nginx-controller-5c9f8';
+    const sondeo = 'pod:kviz-system/kviz-sondeo';
+
+    const escena = construirEscena(lab(), { namespace: 'default', podsDelRecorrido: [ic, sondeo] });
+
+    expect(nombres(escena)).toEqual(['backend-79f9ffc666-k2x8p', 'ingress-nginx-controller-5c9f8', 'nginx']);
+    const pod = escena.pods.find((p) => p.id === ic)!;
+    expect(adentro(pod, escena.regiones.find((r) => r.nodo === 'lab-worker2')!)).toBe(true);
+  });
+});
+
+function podEn(namespace: string, nombre: string, nodo: string | null): Pod {
+  return { ...pod(nombre, nodo), namespace };
+}
+
+const adentro =(c: Caja, region: Caja) =>
   c.x >= region.x && c.y >= region.y && c.x + c.ancho <= region.x + region.ancho && c.y + c.alto <= region.y + region.alto;

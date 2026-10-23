@@ -198,5 +198,3 @@ func TestElEstadoDelPodEsElDeKubectlGetPods(t *testing.T) {
 		}
 	}
 }
-
-func ptrBool(b bool) *bool { return &b }

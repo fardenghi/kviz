@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { pedirFoto } from './api';
-import { construirEscena } from './escena/escena';
+import { construirEscena, namespacesDelFiltro } from './escena/escena';
 import type { Foto } from './foto';
 import { Lienzo } from './lienzo/Lienzo';
 
@@ -13,6 +13,8 @@ export function App() {
   const [{ foto, fotoAnterior }, setFotos] = useState<{ foto: Foto | null; fotoAnterior?: Foto }>({ foto: null });
   const setFoto = (f: Foto) => setFotos((s) => ({ foto: f, fotoAnterior: s.foto ?? undefined }));
   const [error, setError] = useState<string | null>(null);
+  const [mostrarSistema, setMostrarSistema] = useState(false);
+  const [namespace, setNamespace] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -38,9 +40,12 @@ export function App() {
     };
   }, []);
 
+  const namespaces = useMemo(() => (foto ? namespacesDelFiltro(foto, { mostrarSistema }) : []), [foto, mostrarSistema]);
+  // si el namespace elegido deja de ofrecerse (se ocultó el sistema o se fue), el filtro vuelve a "todos"
+  const filtro = namespace !== null && namespaces.includes(namespace) ? namespace : null;
   const escena = useMemo(
-    () => (foto?.conectado ? construirEscena(foto, { fotoAnterior }) : null),
-    [foto, fotoAnterior],
+    () => (foto?.conectado ? construirEscena(foto, { fotoAnterior, mostrarSistema, namespace: filtro }) : null),
+    [foto, fotoAnterior, mostrarSistema, filtro],
   );
 
   return (
@@ -53,6 +58,25 @@ export function App() {
             {foto.contexto || 'sin contexto'}
             {!foto.conectado && <span className="tenue-texto">· desconectado</span>}
           </span>
+        )}
+        {foto?.conectado && (
+          <>
+            <label className="campo">
+              namespace
+              <select value={filtro ?? ''} onChange={(e) => setNamespace(e.target.value || null)}>
+                <option value="">todos</option>
+                {namespaces.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="campo">
+              <input type="checkbox" checked={mostrarSistema} onChange={(e) => setMostrarSistema(e.target.checked)} />
+              namespaces del sistema
+            </label>
+          </>
         )}
       </header>
       {error && <div className="aviso">No se pudo hablar con kviz: {error}</div>}
