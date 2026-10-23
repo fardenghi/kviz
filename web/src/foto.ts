@@ -37,6 +37,34 @@ export interface Foto {
    * sugiere cómo instalarlo (GET /api/comandos?tipo=metrics-server). Panel de detalle (*).
    */
   metricas?: boolean;
+  /**
+   * Advertencias de configuración, ordenadas por id. El backend la manda siempre; es opcional acá
+   * para que los fixtures de la escena no tengan que llevarla.
+   */
+  advertencias?: Advertencia[];
+}
+
+/**
+ * Advertencia de configuración: un error típico que impide que el tráfico llegue, sobre un pod,
+ * un Service o un Ingress, con explicación y comando sugerido. Espejo de internal/foto/advertencias.go;
+ * las reglas (historias 70–75) están en internal/advertencias.
+ */
+export interface Advertencia {
+  /** `<tipo>/<namespace>/<nombre>/<regla>`, con `/<detalle>` si el objeto tiene varias de la misma regla. */
+  id: string;
+  tipo: 'Pod' | 'Service' | 'Ingress';
+  namespace: string;
+  nombre: string;
+  /**
+   * service-sin-pods, service-sin-endpoints-listos, target-port-no-expuesto, probe-puerto-no-expuesto,
+   * imagen-local-sin-bajar, pending-sin-recursos, ingress-sin-clase o ingress-service-inexistente.
+   */
+  regla: string;
+  /** Frase corta: va en la marca roja y como título en el panel. */
+  titulo: string;
+  /** Qué pasa y qué revisar, con los datos del caso. */
+  explicacion: string;
+  comando: { descripcion: string; comando: string };
 }
 
 /** Un Event de Kubernetes. Espejo de internal/foto/events.go. */

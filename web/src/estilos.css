@@ -85,6 +85,11 @@ g.objeto { cursor: pointer; transition: opacity .15s; }
 .puerta-texto { pointer-events: none; }
 .pod-mal { fill: #fff8f8; stroke: #f0c4c4; }
 
+/* advertencias de configuración: punto rojo con "!" en la esquina del objeto; Service e Ingress con borde rojizo */
+.advertencia-punto { fill: var(--mal); stroke: #fff; stroke-width: 2; }
+.advertencia-texto { font-size: 11px; font-weight: 800; fill: #fff; text-anchor: middle; pointer-events: none; }
+.service.con-advertencia:not(.resaltado), .ingress.con-advertencia:not(.resaltado) { stroke: #efb4b4; }
+
 /* marcas por pod: estado (solo si no es Running), containers y reinicios */
 .pod-estado { font-size: 10.5px; font-weight: 600; text-anchor: end; }
 .tono-mal { fill: var(--mal); }
@@ -141,6 +146,9 @@ g.objeto { cursor: pointer; transition: opacity .15s; }
 .endpoint-no-listo .mono-texto { color: var(--tenue); }
 .eslabon { margin: 2px 0; }
 .eslabon-pod { padding-left: 14px; font-size: 12px; }
+.advertencia-detalle { border-left: 3px solid var(--mal); background: #fff8f8; border-radius: 0 6px 6px 0; padding: 6px 8px 2px; margin: 4px 0 8px; }
+.advertencia-titulo { font-weight: 700; color: var(--mal); }
+.advertencia-explicacion { margin: 3px 0 4px; line-height: 1.4; }
 .comando { margin: 4px 0 8px; }
 .comando-descripcion { font-size: 11.5px; margin-bottom: 2px; }
 .comando-linea { display: flex; align-items: center; gap: 6px; background: var(--fondo); border-radius: 6px; padding: 4px 6px; }

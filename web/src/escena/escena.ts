@@ -4,6 +4,7 @@ import type { Foto, Ingress, Pod, Puerta, PuertoService, ReglaIngress, Service, 
 import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWorkload } from './workloads';
 import { type MarcasPod, marcasDePod } from './marcas-pod';
 import { aplicarFoco } from './foco';
+import { advertenciasPorObjeto, titulosDe } from './advertencias';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
 export interface EstadoInterfaz {
@@ -57,7 +58,13 @@ export interface RegionEnEscena extends Caja {
   subtitulo: string;
 }
 
-export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco {
+/** Marca roja de las advertencias de configuración de un objeto (ver advertencias.ts). */
+export interface MarcaDeAdvertencia {
+  /** Títulos de sus advertencias, en el orden de la foto; vacío si no tiene (sin marca). */
+  advertencias: string[];
+}
+
+export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcaDeAdvertencia {
   /** `pod:<namespace>/<nombre>`: único en todo el cluster. */
   id: string;
   nombre: string;
@@ -77,7 +84,7 @@ export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco {
   opacidad: number;
 }
 
-export interface ServiceEnEscena extends Caja, MarcasDeFoco {
+export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia {
   /** `service:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -88,7 +95,7 @@ export interface ServiceEnEscena extends Caja, MarcasDeFoco {
   puertos: string[];
 }
 
-export interface IngressEnEscena extends Caja, MarcasDeFoco {
+export interface IngressEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia {
   /** `ingress:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -244,6 +251,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const regiones: RegionEnEscena[] = [];
   const pods: PodEnEscena[] = [];
 
+  const advertencias = advertenciasPorObjeto(foto);
   const delRecorrido = new Set(estado.podsDelRecorrido);
   const workloads = indiceDeWorkloads(foto);
   const seleccionado = estado.workloadSeleccionado ? workloads.get(estado.workloadSeleccionado) : undefined;
@@ -292,6 +300,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         ...terminando(p, seleccionDeWorkload(p, seleccionado)),
         workload: marcaDeWorkload(p, workloads),
         ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
+        advertencias: titulosDe(advertencias, idPod(p)),
         ...tarjeta,
       });
     });
@@ -353,6 +362,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
       opacidad: 1,
     })),
   );
+
+  for (const o of [...services, ...ingress]) o.advertencias = titulosDe(advertencias, o.id);
 
   const conexiones = [
     ...conexionesIngressService(ingressVisibles, ingress, services),
@@ -432,6 +443,7 @@ function ubicarIngress(visibles: Ingress[], services: ServiceEnEscena[], finEsce
       alto: M.altoIngress + (reglas.length - 1) * M.altoReglaIngress,
       resaltado: false,
       opacidad: 1,
+      advertencias: [],
     });
   };
 
@@ -528,6 +540,7 @@ function ubicarServices(visibles: Service[], pods: PodEnEscena[], finRegiones: n
       alto: M.altoService,
       resaltado: false,
       opacidad: 1,
+      advertencias: [],
     });
   };
 
