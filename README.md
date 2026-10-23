@@ -1,5 +1,7 @@
 # kviz
 
+[![CI](https://github.com/fardenghi/kviz/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fardenghi/kviz/actions/workflows/ci.yml)
+
 kviz is a local tool that draws the Kubernetes cluster of your current kubectl context as a live
 topology view, and lets you debug how traffic travels inside it.
 
