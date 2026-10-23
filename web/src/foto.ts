@@ -1,6 +1,8 @@
 // Contrato de la foto del cluster, tal como la entrega GET /api/foto y el stream (ver tiempoReal.ts).
 // Es el espejo de internal/foto/foto.go: si se agrega un campo allá, se agrega acá.
 // Cada objeto de una lista lleva un `id` único en su lista, y las listas van ordenadas por id.
+// (*) Los campos que solo usa el panel de detalle son opcionales acá para que los fixtures de la
+// escena no tengan que llevarlos; el backend los manda siempre.
 
 export interface Foto {
   /** Contexto de kubectl de kviz, por ejemplo "kind-lab"; "" si kubectl no tiene contexto. */
@@ -28,6 +30,15 @@ export interface Nodo {
   id: string;
   nombre: string;
   internalIP: string;
+  /** status.capacity del nodo. Solo la usa el panel de detalle (*). */
+  capacidad?: Capacidad;
+}
+
+/** Capacidad de un nodo en unidades de Kubernetes ("8", "16365916Ki", "110"); "" si no la informa. */
+export interface Capacidad {
+  cpu: string;
+  memoria: string;
+  pods: string;
 }
 
 export interface Pod {
@@ -35,6 +46,10 @@ export interface Pod {
   id: string;
   nombre: string;
   namespace: string;
+  /** Labels del pod ({} si no tiene). Solo los usa el panel de detalle (*). */
+  labels?: Record<string, string>;
+  /** Hora de creación en RFC 3339 (UTC), para la edad; "" si no se sabe. Panel de detalle (*). */
+  creado?: string;
   /** null cuando el scheduler todavía no le asignó un nodo. */
   nodo: string | null;
   /** null mientras el pod no tiene IP. */
@@ -70,6 +85,15 @@ export interface Workload {
    * nuevo al más viejo. Durante un rollout trae los dos ReplicaSets.
    */
   cadena: Eslabon[];
+  /** Réplicas deseadas y listas; null en un Job o un CronJob. Panel de detalle (*). */
+  replicas?: Replicas | null;
+  /** Estrategia de rollout ("RollingUpdate (maxSurge 25%, maxUnavailable 25%)", "Recreate", "OnDelete"…); "" si no tiene. Panel de detalle (*). */
+  estrategia?: string;
+}
+
+export interface Replicas {
+  deseadas: number;
+  listas: number;
 }
 
 /** Objeto de la cadena de dueños con los pods que crea directamente. */

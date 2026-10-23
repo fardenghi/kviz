@@ -43,8 +43,9 @@ sirve una página que explica cómo compilarla.
 |---|---|
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
 | `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster) |
-| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
+| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle |
+| `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto) |
+| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
@@ -52,6 +53,7 @@ sirve una página que explica cómo compilarla.
 | `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
 | `web/src/superficies/` | superficies flotantes (lista de workloads, …) |
+| `web/src/detalle/` | panel de detalle (cajón a la derecha): `detalle.ts` qué objeto muestra; una sección por archivo en `secciones/` (ver `secciones.ts`); `Comando.tsx` comando sugerido con botón de copiar |
 | `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
 
 Para agregar un objeto a la foto: su informer en `internal/conexion` (con el handler de avisos, para

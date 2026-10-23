@@ -61,3 +61,17 @@ export function escucharFoto(alMensaje: (m: Mensaje) => void, alCortarse: () => 
     fuente?.close();
   };
 }
+
+/** Un comando sugerido de kubectl (GET /api/comandos). Espejo de internal/comandos. */
+export interface ComandoSugerido {
+  descripcion: string;
+  comando: string;
+}
+
+/** Los comandos sugeridos de un objeto: tipo de Kubernetes (Pod, Service, Node, Deployment…), namespace y nombre. */
+export async function pedirComandos(o: { tipo: string; namespace: string; nombre: string }): Promise<ComandoSugerido[]> {
+  const q = new URLSearchParams({ tipo: o.tipo, namespace: o.namespace, nombre: o.nombre });
+  const res = await fetch(`/api/comandos?${q}`);
+  if (!res.ok) throw new Error(`GET /api/comandos respondió ${res.status}`);
+  return res.json();
+}

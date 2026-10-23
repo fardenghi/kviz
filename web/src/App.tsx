@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cambiarContexto, escucharFoto, pedirContextos } from './api';
 import { construirEscena, namespacesDelFiltro, workloadsVisibles } from './escena/escena';
+import { detalleDe, idDeWorkload } from './detalle/detalle';
+import { PanelDeDetalle } from './detalle/PanelDeDetalle';
 import { Lienzo } from './lienzo/Lienzo';
 import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
 import { EN_VIVO_INICIAL, type EnVivo, finDelBrillo, podsNuevos, recibir } from './tiempoReal';
@@ -16,6 +18,9 @@ export function App() {
   const [workload, setWorkload] = useState<string | null>(null);
   // objeto apuntado con el mouse: es el foco (ver escena/foco.ts)
   const [hover, setHover] = useState<string | null>(null);
+  // objeto elegido con un clic (id de escena, o `workload:<id>` desde la lista): da el foco y abre
+  // el panel de detalle (ver detalle/detalle.ts)
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
   // contextos de kubectl para el selector; se vuelven a pedir al abrirlo y cuando cambia la conexión
   const [contextos, setContextos] = useState<string[]>([]);
   const [errorContexto, setErrorContexto] = useState<string | null>(null);
@@ -51,6 +56,7 @@ export function App() {
     setErrorContexto(null);
     setNamespace(null);
     setWorkload(null);
+    setSeleccionado(null);
     cambiarContexto(nombre).catch((e: Error) => setErrorContexto(e.message));
   };
   // el contexto de kviz va siempre en el selector, aunque su cluster se haya borrado del kubeconfig
@@ -74,11 +80,28 @@ export function App() {
             namespace: filtro,
             workloadSeleccionado,
             hover,
+            seleccionado,
             podsNuevos: podsNuevos(enVivo, Date.now()),
           })
         : null,
-    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover], // eslint-disable-line react-hooks/exhaustive-deps
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado], // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  // el panel muestra el objeto mientras siga en la foto; si se borra, se cierra solo
+  const detalle = foto?.conectado && seleccionado ? detalleDe(foto, seleccionado) : null;
+  useEffect(() => {
+    const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && setSeleccionado(null);
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, []);
+  // elegir un workload en la lista lo resalta y lo abre en el panel; deselegirlo cierra su panel
+  const elegirWorkload = (id: string | null) => {
+    setWorkload(id);
+    if (id) setSeleccionado(idDeWorkload({ id }));
+    else setSeleccionado((s) => (s?.startsWith('workload:') ? null : s));
+  };
+  // un objeto abierto desde el panel (el nodo de un pod, su workload…); un workload, además, se resalta
+  const abrir = (id: string) => (id.startsWith('workload:') ? elegirWorkload(id.slice('workload:'.length)) : setSeleccionado(id));
 
   return (
     <div className="app">
@@ -132,8 +155,19 @@ export function App() {
       {!cortado && !foto && <div className="aviso">Cargando…</div>}
       {!cortado && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
       {escena && (
-        <Lienzo escena={escena} alClicEnVacio={() => setWorkload(null)} alApuntar={setHover}>
-          <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={setWorkload} />
+        <Lienzo
+          escena={escena}
+          alClicEnVacio={() => {
+            setWorkload(null);
+            setSeleccionado(null);
+          }}
+          alApuntar={setHover}
+          alClicEnObjeto={setSeleccionado}
+        >
+          <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={elegirWorkload} />
+          {detalle && foto && (
+            <PanelDeDetalle detalle={detalle} foto={foto} abrir={abrir} alCerrar={() => setSeleccionado(null)} />
+          )}
         </Lienzo>
       )}
     </div>

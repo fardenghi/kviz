@@ -17,6 +17,7 @@ export function Lienzo({
   escena,
   alClicEnVacio,
   alApuntar,
+  alClicEnObjeto,
   children,
 }: {
   escena: Escena;
@@ -24,6 +25,8 @@ export function Lienzo({
   alClicEnVacio?: () => void;
   /** El mouse entra a un objeto (su id de escena) o sale de él (null): el foco por hover. */
   alApuntar?: (id: string | null) => void;
+  /** Clic sin arrastrar sobre un objeto (su id de escena; un nodo es su región): abre el panel de detalle. */
+  alClicEnObjeto?: (id: string) => void;
   /** Superficies flotantes que van arriba del lienzo. */
   children?: ReactNode;
 }) {
@@ -45,6 +48,8 @@ export function Lienzo({
     const el = marco.current;
     if (!el) return;
     const alGirar = (e: WheelEvent) => {
+      // sobre una superficie flotante (el panel de detalle, la lista) la rueda la desplaza a ella
+      if ((e.target as Element).closest('.flotante')) return;
       e.preventDefault();
       const r = el.getBoundingClientRect();
       setVista((v) => zoomEn(v, e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - r.left, e.clientY - r.top));
@@ -54,6 +59,7 @@ export function Lienzo({
   }, []);
 
   const apuntar = (id: string): Apuntar => ({
+    'data-objeto': id,
     onMouseEnter: () => alApuntar?.(id),
     onMouseLeave: () => alApuntar?.(null),
   });
@@ -79,7 +85,10 @@ export function Lienzo({
         const a = arrastre.current;
         arrastre.current = null;
         const quieto = a && Math.abs(e.clientX - a.x) + Math.abs(e.clientY - a.y) < 4;
-        if (quieto && !(e.target as Element).closest('.objeto')) alClicEnVacio?.();
+        if (!quieto) return;
+        const objeto = (e.target as Element).closest<HTMLElement | SVGElement>('[data-objeto]');
+        if (objeto) alClicEnObjeto?.(objeto.dataset.objeto!);
+        else if (!(e.target as Element).closest('.objeto')) alClicEnVacio?.();
       }}
       onMouseLeave={() => (arrastre.current = null)}
     >
@@ -129,13 +138,14 @@ export function Lienzo({
 }
 
 /** Handlers del foco por hover de un objeto. */
-type Apuntar = { onMouseEnter: () => void; onMouseLeave: () => void };
+type Apuntar = { 'data-objeto': string; onMouseEnter: () => void; onMouseLeave: () => void };
 
 const clases = (...c: (string | false)[]) => c.filter(Boolean).join(' ');
 
 function Region({ region: r }: { region: RegionEnEscena }) {
+  // la región de un nodo se abre en el panel de detalle; la de "Sin nodo asignado", no
   return (
-    <g>
+    <g data-objeto={r.nodo ? r.id : undefined}>
       <rect x={r.x} y={r.y} width={r.ancho} height={r.alto} rx={14} className={r.nodo ? 'region' : 'region region-sin-nodo'} />
       <text x={r.x + 16} y={r.y + 25} className="region-titulo">{r.titulo}</text>
       <text x={r.x + 16} y={r.y + 40} className="mono tenue">{r.subtitulo}</text>
