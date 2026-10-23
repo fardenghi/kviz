@@ -16,11 +16,14 @@ import { encuadrar, type Vista, zoomEn } from './vista';
 export function Lienzo({
   escena,
   alClicEnVacio,
+  alApuntar,
   children,
 }: {
   escena: Escena;
   /** Clic sobre el fondo, sin arrastrar: limpia la selección. */
   alClicEnVacio?: () => void;
+  /** El mouse entra a un objeto (su id de escena) o sale de él (null): el foco por hover. */
+  alApuntar?: (id: string | null) => void;
   /** Superficies flotantes que van arriba del lienzo. */
   children?: ReactNode;
 }) {
@@ -49,6 +52,11 @@ export function Lienzo({
     el.addEventListener('wheel', alGirar, { passive: false });
     return () => el.removeEventListener('wheel', alGirar);
   }, []);
+
+  const apuntar = (id: string): Apuntar => ({
+    onMouseEnter: () => alApuntar?.(id),
+    onMouseLeave: () => alApuntar?.(null),
+  });
 
   const zoomCentro = (factor: number) => {
     const el = marco.current;
@@ -82,6 +90,10 @@ export function Lienzo({
             <rect width={4} height={4} className="rayado-fondo" />
             <line x1={0} y1={0} x2={0} y2={4} className="rayado-linea" />
           </pattern>
+          {/* flecha de las conexiones con foco, del color de la línea */}
+          <marker id="flecha" viewBox="0 0 8 8" refX={7} refY={4} markerWidth={9} markerHeight={9} markerUnits="userSpaceOnUse" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" className="flecha" />
+          </marker>
         </defs>
         <g transform={`translate(${vista.x},${vista.y}) scale(${vista.escala})`}>
           {escena.regiones.map((r) => (
@@ -91,16 +103,16 @@ export function Lienzo({
             <Conexion key={c.id} conexion={c} />
           ))}
           {escena.ingress.map((i) => (
-            <TarjetaIngress key={i.id} ingress={i} />
+            <TarjetaIngress key={i.id} ingress={i} apuntar={apuntar(i.id)} />
           ))}
           {escena.services.map((s) => (
-            <TarjetaService key={s.id} service={s} />
+            <TarjetaService key={s.id} service={s} apuntar={apuntar(s.id)} />
           ))}
           {escena.puertas.map((p) => (
-            <PestanaPuerta key={p.id} puerta={p} />
+            <PestanaPuerta key={p.id} puerta={p} apuntar={apuntar(p.id)} />
           ))}
           {escena.pods.map((p) => (
-            <TarjetaPod key={p.id} pod={p} />
+            <TarjetaPod key={p.id} pod={p} apuntar={apuntar(p.id)} />
           ))}
         </g>
       </svg>
@@ -116,6 +128,11 @@ export function Lienzo({
   );
 }
 
+/** Handlers del foco por hover de un objeto. */
+type Apuntar = { onMouseEnter: () => void; onMouseLeave: () => void };
+
+const clases = (...c: (string | false)[]) => c.filter(Boolean).join(' ');
+
 function Region({ region: r }: { region: RegionEnEscena }) {
   return (
     <g>
@@ -130,14 +147,20 @@ function Region({ region: r }: { region: RegionEnEscena }) {
 function Conexion({ conexion: c }: { conexion: ConexionEnEscena }) {
   const { inicio: a, fin: b } = c;
   const my = (a.y + b.y) / 2;
-  return <path d={`M${a.x},${a.y} C${a.x},${my} ${b.x},${my} ${b.x},${b.y}`} className={`conexion conexion-${c.tono}`} />;
+  return (
+    <path
+      d={`M${a.x},${a.y} C${a.x},${my} ${b.x},${my} ${b.x},${b.y}`}
+      className={clases('conexion', `conexion-${c.tono}`, !!c.dePuerta && 'conexion-puerta')}
+      markerEnd={c.tono === 'foco' ? 'url(#flecha)' : undefined}
+    />
+  );
 }
 
-function TarjetaService({ service: s }: { service: ServiceEnEscena }) {
+function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apuntar: Apuntar }) {
   const puertos = s.puertos.join(', ');
   return (
-    <g>
-      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className="service" />
+    <g className="objeto" opacity={s.opacidad} {...apuntar}>
+      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className={clases('service', s.resaltado && 'resaltado')} />
       <text x={s.x + 20} y={s.y + 20} className="pod-nombre">
         {recortar(s.nombre, s.ancho - 12 - 6.2 * (s.tipo.length + 1))} <tspan className="tipo">{s.tipo}</tspan>
         <title>{`Service ${s.nombre} · namespace ${s.namespace}`}</title>
@@ -151,10 +174,10 @@ function TarjetaService({ service: s }: { service: ServiceEnEscena }) {
   );
 }
 
-function TarjetaIngress({ ingress: i }: { ingress: IngressEnEscena }) {
+function TarjetaIngress({ ingress: i, apuntar }: { ingress: IngressEnEscena; apuntar: Apuntar }) {
   return (
-    <g>
-      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className="ingress" />
+    <g className="objeto" opacity={i.opacidad} {...apuntar}>
+      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className={clases('ingress', i.resaltado && 'resaltado')} />
       <text x={i.x + 12} y={i.y + 22} className="pod-nombre">
         {recortar(i.nombre, i.ancho - 6.2 * (i.clase.length + 10))} <tspan className="tipo">Ingress · {i.clase}</tspan>
         <title>{`Ingress ${i.nombre} · namespace ${i.namespace}`}</title>
@@ -169,10 +192,10 @@ function TarjetaIngress({ ingress: i }: { ingress: IngressEnEscena }) {
   );
 }
 
-function PestanaPuerta({ puerta: p }: { puerta: PuertaEnEscena }) {
+function PestanaPuerta({ puerta: p, apuntar }: { puerta: PuertaEnEscena; apuntar: Apuntar }) {
   return (
-    <g>
-      <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={5} className={`puerta puerta-${p.tipo}`} />
+    <g className="objeto" opacity={p.opacidad} {...apuntar}>
+      <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={5} className={clases('puerta', `puerta-${p.tipo}`, p.resaltado && 'resaltado')} />
       <text x={p.x + p.ancho / 2} y={p.y + 16} className={`puerta-texto puerta-texto-${p.tipo}`}>{p.texto}</text>
       <title>{p.titulo}</title>
     </g>
@@ -201,11 +224,11 @@ const recortarEtiqueta = (texto: string, ip: string, ancho: number) => {
   return texto.length > max ? texto.slice(0, Math.max(1, max - 1)) + '…' : texto;
 };
 
-function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
+function TarjetaPod({ pod: p, apuntar }: { pod: PodEnEscena; apuntar: Apuntar }) {
   // el lienzo no recorta el SVG: la barra se dibuja adentro de la tarjeta con su propio clip
   const clip = `clip-${p.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   return (
-    <g opacity={p.opacidad} className={p.terminando ? 'objeto pod-terminando' : 'objeto'}>
+    <g opacity={p.opacidad} className={p.terminando ? 'objeto pod-terminando' : 'objeto'} {...apuntar}>
       <clipPath id={clip}>
         <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={8} />
       </clipPath>
@@ -215,7 +238,7 @@ function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
         width={p.ancho}
         height={p.alto}
         rx={8}
-        className={['pod', p.tonoEstado === 'mal' && 'pod-mal', p.nuevo && 'pod-nuevo'].filter(Boolean).join(' ')}
+        className={clases('pod', p.tonoEstado === 'mal' && 'pod-mal', p.nuevo && 'pod-nuevo', p.resaltado && 'resaltado')}
         style={{
           ...(p.bordeWorkload ? { stroke: p.bordeWorkload, strokeWidth: 2.5 } : {}),
           ...(p.nuevo ? brillo : {}),

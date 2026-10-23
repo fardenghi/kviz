@@ -14,6 +14,8 @@ export function App() {
   const [mostrarSistema, setMostrarSistema] = useState(false);
   const [namespace, setNamespace] = useState<string | null>(null);
   const [workload, setWorkload] = useState<string | null>(null);
+  // objeto apuntado con el mouse: es el foco (ver escena/foco.ts)
+  const [hover, setHover] = useState<string | null>(null);
 
   useEffect(
     () =>
@@ -52,10 +54,11 @@ export function App() {
             mostrarSistema,
             namespace: filtro,
             workloadSeleccionado,
+            hover,
             podsNuevos: podsNuevos(enVivo, Date.now()),
           })
         : null,
-    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado], // eslint-disable-line react-hooks/exhaustive-deps
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (
@@ -93,7 +96,7 @@ export function App() {
       {!cortado && !foto && <div className="aviso">Cargando…</div>}
       {!cortado && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
       {escena && (
-        <Lienzo escena={escena} alClicEnVacio={() => setWorkload(null)}>
+        <Lienzo escena={escena} alClicEnVacio={() => setWorkload(null)} alApuntar={setHover}>
           <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={setWorkload} />
         </Lienzo>
       )}

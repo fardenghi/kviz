@@ -68,6 +68,19 @@ body { background: var(--fondo); }
 .conexion { fill: none; stroke: #aab3be; stroke-width: 1.2; }
 .conexion-reposo { opacity: .35; }
 .conexion-no-listo { opacity: .3; stroke-dasharray: 3 4; }
+/* foco: las conexiones relacionadas en azul y con flecha, las demás casi desaparecen; las líneas de
+   puerta (solo con foco) en verde azulado y punteadas */
+.conexion { transition: opacity .15s; }
+.conexion-foco { stroke: var(--foco); stroke-width: 2; opacity: 1; }
+.conexion-fantasma { opacity: .06; }
+.conexion-puerta.conexion-foco { stroke: #1f7a8c; stroke-dasharray: 4 3; }
+.flecha { fill: context-stroke; }
+g.objeto { cursor: pointer; transition: opacity .15s; }
+.pod.resaltado, .service.resaltado, .ingress.resaltado { stroke: var(--foco); stroke-width: 2; }
+.puerta-NodePort.resaltado { fill: #1f7a8c; stroke: #1f7a8c; }
+.puerta-hostPort.resaltado { fill: #a25a12; stroke: #a25a12; }
+.puerta.resaltado + .puerta-texto { fill: #fff; }
+.puerta-texto { pointer-events: none; }
 .pod-mal { fill: #fff8f8; stroke: #f0c4c4; }
 
 /* marcas por pod: estado (solo si no es Running), containers y reinicios */
