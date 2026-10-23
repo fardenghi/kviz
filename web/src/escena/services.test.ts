@@ -11,6 +11,8 @@ const pod = (nombre: string, nodo: string | null): Pod => ({
   nodo,
   ip: nodo ? '10.244.0.1' : null,
   fase: nodo ? 'Running' : 'Pending',
+  estado: nodo ? 'Running' : 'Pending',
+  containers: [],
   workload: null,
 });
 const listo = (pod: string): Endpoint => ({ ip: '10.244.0.1', pod, nodo: null, listo: true });

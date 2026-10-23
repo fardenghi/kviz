@@ -10,7 +10,9 @@ import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
 const REINTENTO_MS = 2000;
 
 export function App() {
-  const [foto, setFoto] = useState<Foto | null>(null);
+  // la foto anterior va a la escena para marcar lo que cambió (reinicios que aumentaron)
+  const [{ foto, fotoAnterior }, setFotos] = useState<{ foto: Foto | null; fotoAnterior?: Foto }>({ foto: null });
+  const setFoto = (f: Foto) => setFotos((s) => ({ foto: f, fotoAnterior: s.foto ?? undefined }));
   const [error, setError] = useState<string | null>(null);
   const [mostrarSistema, setMostrarSistema] = useState(false);
   const [namespace, setNamespace] = useState<string | null>(null);
@@ -50,8 +52,8 @@ export function App() {
   // si el workload seleccionado se borra o queda oculto por los filtros, se deselecciona
   const workloadSeleccionado = workload !== null && workloads.some((w) => w.id === workload) ? workload : null;
   const escena = useMemo(
-    () => (foto?.conectado ? construirEscena(foto, { mostrarSistema, namespace: filtro, workloadSeleccionado }) : null),
-    [foto, mostrarSistema, filtro, workloadSeleccionado],
+    () => (foto?.conectado ? construirEscena(foto, { fotoAnterior, mostrarSistema, namespace: filtro, workloadSeleccionado }) : null),
+    [foto, fotoAnterior, mostrarSistema, filtro, workloadSeleccionado],
   );
 
   return (

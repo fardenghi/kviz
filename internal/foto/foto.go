@@ -44,6 +44,11 @@ type Pod struct {
 	IP *string `json:"ip"`
 	// Fase es status.phase: Pending, Running, Succeeded, Failed o Unknown.
 	Fase string `json:"fase"`
+	// Estado es la columna STATUS de kubectl get pods: Running, Init:0/1, CrashLoopBackOff,
+	// Completed, Terminating…
+	Estado string `json:"estado"`
+	// Containers en orden de vida: init, normales y ephemeral.
+	Containers []Container `json:"containers"`
 	// Workload es el id del workload dueño del pod, o nil si es un Pod suelto.
 	Workload *string `json:"workload"`
 }
@@ -109,12 +114,14 @@ func Construir(contexto string, o Objetos) Foto {
 	f.Workloads = workloads
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
-			Workload:  opcional(workloadDePod[p.Namespace+"/"+p.Name]),
-			Nombre:    p.Name,
-			Namespace: p.Namespace,
-			Nodo:      opcional(p.Spec.NodeName),
-			IP:        opcional(p.Status.PodIP),
-			Fase:      string(p.Status.Phase),
+			Nombre:     p.Name,
+			Namespace:  p.Namespace,
+			Nodo:       opcional(p.Spec.NodeName),
+			IP:         opcional(p.Status.PodIP),
+			Fase:       string(p.Status.Phase),
+			Estado:     estadoPod(p),
+			Containers: containers(p),
+			Workload:   opcional(workloadDePod[p.Namespace+"/"+p.Name]),
 		})
 	}
 	sort.Slice(f.Pods, func(i, j int) bool {

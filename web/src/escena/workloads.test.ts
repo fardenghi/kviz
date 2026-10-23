@@ -16,6 +16,8 @@ const pod = (namespace: string, nombre: string, nodo: string, workload: string |
   nodo,
   ip: '10.244.1.1',
   fase: 'Running',
+  estado: 'Running',
+  containers: [],
   workload,
 });
 

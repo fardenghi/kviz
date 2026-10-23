@@ -32,6 +32,10 @@ export interface Pod {
   ip: string | null;
   /** status.phase: Pending, Running, Succeeded, Failed o Unknown. */
   fase: string;
+  /** Columna STATUS de kubectl get pods: Running, Init:0/1, CrashLoopBackOff, Completed, Terminating… */
+  estado: string;
+  /** En orden de vida: init, normales y ephemeral. */
+  containers: Container[];
   /** id del workload dueño del pod; null si es un Pod suelto. */
   workload: string | null;
 }
@@ -63,6 +67,28 @@ export interface Eslabon {
   nombre: string;
   /** Nombres de sus pods (mismo namespace que el workload). */
   pods: string[];
+}
+
+/** normal (spec.containers), init (spec.initContainers) o ephemeral (agregado por kubectl debug). */
+export type TipoContainer = 'normal' | 'init' | 'ephemeral';
+
+export interface Container {
+  nombre: string;
+  tipo: TipoContainer;
+  imagen: string;
+  puertos: Puerto[];
+  /** Running, el motivo de la espera (CrashLoopBackOff, PodInitializing…) o de la terminación (Completed, Error…). */
+  estado: string;
+  ready: boolean;
+  started: boolean;
+  reinicios: number;
+}
+
+export interface Puerto {
+  numero: number;
+  /** Nombre del puerto ("http"), si tiene. */
+  nombre?: string;
+  protocolo: string;
 }
 
 export interface Service {

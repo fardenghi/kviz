@@ -2,9 +2,12 @@
 // interfaz a escena. Decide qué se dibuja, dónde y con qué texto; el lienzo solo la pinta.
 import type { Foto, Pod, PuertoService, Service, Workload } from '../foto';
 import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWorkload } from './workloads';
+import { type MarcasPod, marcasDePod } from './marcas-pod';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
 export interface EstadoInterfaz {
+  /** La foto que se dibujó antes de esta, para marcar lo que cambió (reinicios que aumentaron). */
+  fotoAnterior?: Foto;
   /** Interruptor de los namespaces del sistema; por defecto ocultos. `kviz-system` nunca se ve. */
   mostrarSistema?: boolean;
   /** Filtro por namespace: solo se ven los pods de este namespace. Sin valor, todos. */
@@ -33,7 +36,7 @@ export interface RegionEnEscena extends Caja {
   subtitulo: string;
 }
 
-export interface PodEnEscena extends Caja {
+export interface PodEnEscena extends Caja, MarcasPod {
   /** `pod:<namespace>/<nombre>`: único en todo el cluster. */
   id: string;
   nombre: string;
@@ -142,13 +145,12 @@ export function namespacesDelFiltro(foto: Foto, estado: EstadoInterfaz = {}): st
 
 /** Workloads de la lista: los de los namespaces que la vista muestra, con los mismos filtros que los pods. */
 export function workloadsVisibles(foto: Foto, estado: EstadoInterfaz = {}): Workload[] {
-  return (foto.workloads ?? []).filter(
-    (w) => pasaElInterruptor(w.namespace, estado) && (!estado.namespace || w.namespace === estado.namespace),
-  );
+  return (foto.workloads ?? []).filter((w) => seVe(w.namespace, estado));
 }
 
 export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena {
   const M = MEDIDAS;
+  const anteriores = new Map((estado.fotoAnterior?.pods ?? []).map((p) => [idPod(p), p]));
   const regiones: RegionEnEscena[] = [];
   const pods: PodEnEscena[] = [];
 
@@ -183,6 +185,12 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
     const alto = M.cabecera + filas * (M.altoPod + M.hueco) - M.hueco + M.relleno;
     regiones.push({ ...g, x, y, ancho: anchoRegion, alto });
     suyos.forEach((p, i) => {
+      const tarjeta = {
+        x: x + M.relleno + (i % M.columnas) * (M.anchoPod + M.hueco),
+        y: y + M.cabecera + Math.floor(i / M.columnas) * (M.altoPod + M.hueco),
+        ancho: M.anchoPod,
+        alto: M.altoPod,
+      };
       pods.push({
         id: idPod(p),
         nombre: p.nombre,
@@ -191,10 +199,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         region: g.id,
         workload: marcaDeWorkload(p, workloads),
         ...seleccionDeWorkload(p, seleccionado),
-        x: x + M.relleno + (i % M.columnas) * (M.anchoPod + M.hueco),
-        y: y + M.cabecera + Math.floor(i / M.columnas) * (M.altoPod + M.hueco),
-        ancho: M.anchoPod,
-        alto: M.altoPod,
+        ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
+        ...tarjeta,
       });
     });
     x += anchoRegion + M.separacionNodos;
@@ -209,7 +215,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   // los nodos bajan para dejar arriba las filas de Services
   if (services.length > 0) {
     const bajar = Math.max(...services.map((s) => s.y + s.alto)) + M.separacionServices;
-    for (const c of [...regiones, ...pods]) c.y += bajar;
+    for (const c of [...regiones, ...pods, ...pods.flatMap((p) => p.containers)]) c.y += bajar;
   }
 
   const conexiones = conexionesServicePod(foto.services, services, pods);
