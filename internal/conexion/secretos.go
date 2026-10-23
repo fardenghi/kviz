@@ -10,9 +10,6 @@ import (
 // ErrSecretInexistente es el error de revelar un Secret, o una clave de un Secret, que no existe.
 var ErrSecretInexistente = errors.New("no existe ese Secret o esa clave")
 
-// ErrDesconectado es el error de pedir algo al cluster mientras kviz no lo ve.
-var ErrDesconectado = errors.New("kviz no está conectado al cluster")
-
 // ValorDeSecret revela el valor de una clave de un Secret. Es el único camino por el que un
 // valor de Secret sale de kviz: la foto trae solo las claves.
 func (g *Gestor) ValorDeSecret(namespace, nombre, clave string) (string, error) {

@@ -39,6 +39,8 @@ type Foto struct {
 	ConfigMaps []ConfigMap `json:"configMaps"`
 	// Secrets sin valores (solo sus claves), ordenados por id (namespace y nombre).
 	Secrets []Secret `json:"secrets"`
+	// Events del cluster ordenados por id (namespace y nombre del Event; ver events.go).
+	Events []Event `json:"events"`
 }
 
 type Nodo struct {
@@ -130,6 +132,7 @@ type Objetos struct {
 	ConfigMaps     []*corev1.ConfigMap
 	// Secrets: de acá solo salen sus claves; los valores nunca llegan a la foto (ver env.go).
 	Secrets []*corev1.Secret
+	Events  []corev1.Event
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
@@ -164,12 +167,13 @@ func Construir(contexto string, o Objetos) Foto {
 	completarEnv(f.Pods, o)
 	f.ConfigMaps, f.Secrets = configMaps(o), secrets(o)
 	f.Puertas = puertas(f.Nodos, f.Services, o)
+	f.Events = events(f, o)
 	return f
 }
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	f := Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
+	f := Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}, Events: []Event{}}
 	f.ConfigMaps, f.Secrets = []ConfigMap{}, []Secret{}
 	return f
 }
