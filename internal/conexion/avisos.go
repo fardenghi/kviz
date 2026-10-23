@@ -13,11 +13,9 @@ type avisos struct {
 	subs map[chan struct{}]struct{}
 }
 
-// Suscribir devuelve un canal que avisa cada vez que la foto puede haber cambiado (un objeto
-// observado se creó, cambió o se borró, o cambió el estado de la conexión), y la función para
-// dejar de escuchar. Hay que pedir la foto después de suscribirse, así no se pierde ningún cambio.
-func (c *Conexion) Suscribir() (<-chan struct{}, func()) {
-	a := &c.avisos
+// suscribir devuelve un canal que avisa cada vez que la foto puede haber cambiado, y la función
+// para dejar de escuchar.
+func (a *avisos) suscribir() (<-chan struct{}, func()) {
 	ch := make(chan struct{}, 1)
 	a.mu.Lock()
 	if a.subs == nil {

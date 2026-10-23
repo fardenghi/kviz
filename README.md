@@ -42,9 +42,9 @@ sirve una página que explica cómo compilarla.
 | Dónde | Qué (módulo de la spec) |
 |---|---|
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
-| `internal/conexion/` | 1 · conexión al cluster: contexto de kubectl, informers, conectado/desconectado |
+| `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster) |
 | `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
+| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
@@ -66,3 +66,15 @@ cambiaron sin código nuevo.
 `tipo`: primero `{"tipo":"foto","foto":{…}}` con la foto completa y después
 `{"tipo":"cambios","cambios":[…]}` con lo que cambió (ver `foto.Cambio`). El canal admite más tipos
 de mensaje; el escritor de SSE (`sse` en `stream.go`) sirve también para otras rutas.
+
+## Contexto y reconexión
+
+kviz arranca en el contexto actual de kubectl y nunca modifica el kubeconfig. `GET /api/contextos`
+devuelve `{"actual", "contextos"}` (se relee el kubeconfig en cada pedido) y `POST /api/contexto`
+con `{"contexto": "<nombre>"}` cambia en caliente (204; 404 si el contexto no existe). El `Gestor`
+revisa cada 2 s que el cluster responda: si deja de responder (o su contexto se va del kubeconfig,
+como con `kind delete cluster`) apaga los informers y la foto queda desconectada con el motivo;
+reintenta con un cliente nuevo del kubeconfig hasta que el cluster vuelve. Sin contexto, espera a
+que kubectl tenga uno. El stream manda la foto completa (`tipo: "foto"`) cada vez que cambia el
+contexto o el estado de conexión. En los tests, `kubeconfigDePrueba` (`internal/api/contexto_test.go`)
+tiene varios clusters falsos que se pueden crear, borrar o hacer caer.
