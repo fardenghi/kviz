@@ -151,6 +151,23 @@ func TestElHistorialGuardaCadaRequestDeLaSesionConSuRespuestaYSuRecorrido(t *tes
 	}
 }
 
+func TestElHistorialNoOlvidaNingunaPruebaDeLaSesion(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuia()...)
+	const muchas = 150
+	for range muchas {
+		kviz.repetirPrueba(t, pedidoRepetido{pedidoDePrueba: pedidoDePrueba{Destino: "backend.default"}})
+	}
+
+	var historial []pruebaConReparto
+	kviz.getJSON(t, "/api/pruebas", &historial)
+
+	if len(historial) != muchas || historial[0].ID != 1 {
+		t.Fatalf("historial con %d pruebas, la primera %d; want las %d desde la 1", len(historial), historial[0].ID, muchas)
+	}
+	var primera pruebaConReparto
+	kviz.getJSON(t, "/api/pruebas/1", &primera)
+}
+
 func TestUnaPruebaQueNoEstaEnElHistorialEs404(t *testing.T) {
 	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuia()...)
 	kviz.repetirPrueba(t, pedidoRepetido{pedidoDePrueba: pedidoDePrueba{Destino: "backend.default"}})

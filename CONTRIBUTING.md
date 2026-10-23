@@ -165,5 +165,5 @@ counts the answers per pod with the same identification as the path (`trafico.Re
 `PodQueRespondio`): `{"total", "pods": [{"pod", "n"}], "sinIdentificar", "sinRespuesta"}`. The
 scene draws it as an `n/N` badge on each pod (`escena/reparto.ts`) and the path card as bars. Every
 test (with its `contexto`) goes into the session history: `GET /api/pruebas` returns them all, oldest
-first, and `GET /api/pruebas/{id}` one (404 if it isn't there). It lives only in memory (the last
-100) and is lost when kviz exits.
+first, and `GET /api/pruebas/{id}` one (404 if it isn't there). It keeps every test of the session,
+lives only in memory and is lost when kviz exits.

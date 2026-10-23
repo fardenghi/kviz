@@ -1,17 +1,14 @@
 package api
 
 // Historial de las requests de prueba de la sesión: GET /api/pruebas (todas, en orden) y
-// GET /api/pruebas/{id} (una, para volver a ver su respuesta y su recorrido). Vive solo en memoria:
-// se pierde al cerrar kviz y nunca se escribe en disco.
+// GET /api/pruebas/{id} (una, para volver a ver su respuesta y su recorrido). Guarda cada prueba de
+// la sesión, sin tope. Vive solo en memoria: se pierde al cerrar kviz y nunca se escribe en disco.
 
 import (
 	"net/http"
 	"strconv"
 	"sync"
 )
-
-// maxHistorial es cuántas pruebas recuerda la sesión; las más viejas se olvidan.
-const maxHistorial = 100
 
 type historial struct {
 	mu      sync.Mutex
@@ -31,9 +28,6 @@ func (h *historial) guardar(p prueba) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pruebas = append(h.pruebas, p)
-	if len(h.pruebas) > maxHistorial {
-		h.pruebas = h.pruebas[len(h.pruebas)-maxHistorial:]
-	}
 }
 
 func (h *historial) listar(w http.ResponseWriter, _ *http.Request) {
