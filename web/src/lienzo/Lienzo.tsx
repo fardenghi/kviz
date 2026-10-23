@@ -318,6 +318,18 @@ function TarjetaPod({ pod: p, apuntar }: { pod: PodEnEscena; apuntar: Apuntar })
       )}
       <Pasos x={p.x} y={p.y} pasos={p.pasos} />
       <MarcaDeAdvertencia x={p.x + p.ancho} y={p.y} titulos={p.advertencias} />
+      {p.reparto && <PastillaDeReparto x={p.x + p.ancho - 46} y={p.y + p.alto - 9} texto={p.reparto} />}
+    </g>
+  );
+}
+
+// pastilla rosa del reparto (`3/8`), a caballo del borde de abajo a la derecha del pod
+function PastillaDeReparto({ x, y, texto }: { x: number; y: number; texto: string }) {
+  return (
+    <g className="reparto">
+      <rect x={x} y={y} width={40} height={18} rx={9} className="reparto-pastilla" />
+      <text x={x + 20} y={y + 12.5} className="reparto-texto">{texto}</text>
+      <title>{`respondió ${texto} de las requests repetidas`}</title>
     </g>
   );
 }

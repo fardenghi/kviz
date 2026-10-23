@@ -33,6 +33,11 @@ export interface Foto {
    */
   events?: EventDelCluster[];
   /**
+   * Si el cluster tiene metrics-server. Sin él, los containers no traen su consumo y el panel
+   * sugiere cómo instalarlo (GET /api/comandos?tipo=metrics-server). Panel de detalle (*).
+   */
+  metricas?: boolean;
+  /**
    * Advertencias de configuración, ordenadas por id. El backend la manda siempre; es opcional acá
    * para que los fixtures de la escena no tengan que llevarla.
    */
@@ -181,10 +186,73 @@ export interface Container {
   ready: boolean;
   started: boolean;
   reinicios: number;
+  /** Liveness, readiness y startup, en ese orden, con su estado de probe. Panel de detalle (*). */
+  probes?: Probe[];
+  /** Requests y limits de CPU y memoria, con el consumo. Panel de detalle (*). */
+  recursos?: Recursos;
   /** Variables de entorno con su origen: las de envFrom y después las de env. Panel de detalle (*). */
   env?: Variable[];
   /** Volúmenes del pod montados en el container. Panel de detalle (*). */
   montajes?: Montaje[];
+}
+
+/** Estado de probe: kviz lo deduce de señales indirectas (Ready, Started, reinicios, events). */
+export type EstadoDeProbe = 'ok' | 'fallando' | 'pendiente' | 'sin probe';
+
+/** Una probe de un container. Espejo de internal/foto/probes.go. */
+export interface Probe {
+  nombre: 'liveness' | 'readiness' | 'startup';
+  estado: EstadoDeProbe;
+  /** null si el container no tiene esa probe. */
+  config: ConfigDeProbe | null;
+  /** Señales de las que se dedujo el estado ("Ready: false", "3 fallos (events Unhealthy)…"). */
+  senales: string[];
+  /** Últimos events Unhealthy/Killing de la probe, del más nuevo al más viejo. */
+  fallos: FalloDeProbe[];
+}
+
+/** Configuración de una probe, con los valores por defecto de Kubernetes ya puestos. */
+export interface ConfigDeProbe {
+  tipo: 'httpGet' | 'tcpSocket' | 'exec' | 'grpc';
+  path?: string;
+  /** Número o nombre de un puerto del container. */
+  puerto?: string;
+  host?: string;
+  esquema?: string;
+  comando?: string[];
+  initialDelaySeconds: number;
+  periodSeconds: number;
+  timeoutSeconds: number;
+  successThreshold: number;
+  failureThreshold: number;
+}
+
+export interface FalloDeProbe {
+  /** Unhealthy (la probe falló) o Killing (el kubelet reinició el container por la probe). */
+  motivo: string;
+  mensaje: string;
+  veces: number;
+  /** RFC 3339 (UTC); "" si no se sabe. */
+  cuando: string;
+}
+
+export interface Recursos {
+  cpu: Recurso;
+  memoria: Recurso;
+}
+
+/** Cada valor es null si no está: sin request, sin limit, o sin consumo medido. */
+export interface Recurso {
+  request: Cantidad | null;
+  limit: Cantidad | null;
+  consumo: Cantidad | null;
+}
+
+export interface Cantidad {
+  /** Como lo escribe Kubernetes ("500m", "1Gi"); el consumo, en milicores o en Mi. */
+  texto: string;
+  /** En milicores (CPU) o en bytes (memoria). */
+  valor: number;
 }
 
 /** De dónde sale una variable de entorno. */

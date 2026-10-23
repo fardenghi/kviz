@@ -37,8 +37,16 @@ func (kubeconfigDeKubectl) Cliente(contexto string) (kubernetes.Interface, error
 	return kubernetes.NewForConfig(cfg)
 }
 
+func (kubeconfigDeKubectl) Metricas(contexto string) (Metricas, error) {
+	cfg, err := ConfigDeKubectl(contexto)
+	if err != nil {
+		return nil, err
+	}
+	return metricasDe(cfg)
+}
+
 // ConfigDeKubectl es la configuración de la API del cluster de un contexto del kubeconfig de
-// kubectl (la usa el pod de sondeo para hacer exec, como kubectl exec).
+// kubectl (la usa el pod de sondeo para hacer exec, como kubectl exec, y las métricas).
 func ConfigDeKubectl(contexto string) (*rest.Config, error) {
 	crudo, err := clientcmd.NewDefaultClientConfigLoadingRules().Load()
 	if err != nil {

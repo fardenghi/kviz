@@ -119,18 +119,20 @@ func TestUnaRequestDePruebaAUnServiceDevuelveLaRespuestaDelPodDeSondeo(t *testin
 	}
 }
 
-func TestElRecorridoBasicoVaDelServiceASusEndpointsYAlPodQueRespondio(t *testing.T) {
+func TestElRecorridoAUnNombreDNSVaDelDNSAlServiceASusEndpointsYAlPodQueRespondio(t *testing.T) {
 	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuia()...)
 	kviz.sondeo.responder(sondeo.RespuestaHTTP{Status: 200, Body: "Hello, " + podK2x8p + "!"})
 
 	_, got := kviz.mandarPrueba(t, pedidoDePrueba{Destino: "backend.default.svc.cluster.local:80", Path: "/hello"})
 
 	want := []pasoJSON{
-		{N: 1, Tipo: "service", Titulo: "backend 10.96.11.121:80 → :8081", Detalle: "NodePort, targetPort 8081",
+		{N: 1, Tipo: "dns", Titulo: "backend.default.svc.cluster.local → 10.96.11.121", Detalle: "CoreDNS resuelve el nombre del Service a su ClusterIP",
 			Objetos: []refJSON{{Tipo: "service", ID: "default/backend"}}},
-		{N: 2, Tipo: "endpoints", Titulo: "10.244.1.5:8081, 10.244.2.4:8081", Detalle: "2 endpoints listos; kube-proxy elige uno",
+		{N: 2, Tipo: "service", Titulo: "backend 10.96.11.121:80 → :8081", Detalle: "NodePort, targetPort 8081",
+			Objetos: []refJSON{{Tipo: "service", ID: "default/backend"}}},
+		{N: 3, Tipo: "endpoints", Titulo: "10.244.1.5:8081, 10.244.2.4:8081", Detalle: "2 endpoints listos; kube-proxy elige uno",
 			Objetos: []refJSON{{Tipo: "pod", ID: "default/" + podK2x8p}, {Tipo: "pod", ID: "default/" + pod7hw4q}}},
-		{N: 3, Tipo: "pod", Titulo: podK2x8p + " 10.244.1.5", Detalle: "Conocido: el body de la respuesta trae el nombre del pod",
+		{N: 4, Tipo: "pod", Titulo: podK2x8p + " 10.244.1.5", Detalle: "Conocido: el body de la respuesta trae el nombre del pod",
 			Objetos: []refJSON{{Tipo: "pod", ID: "default/" + podK2x8p}}},
 	}
 	if !reflect.DeepEqual(got.Recorrido.Pasos, want) {
@@ -177,8 +179,8 @@ func TestUnaRequestSinRespuestaDiceElMotivoYMuestraElRecorrido(t *testing.T) {
 	if status != http.StatusOK || got.Respuesta != nil || got.Error != "Failed to connect to backend.default port 80: Connection refused" {
 		t.Fatalf("status %d, prueba = %s, want sin respuesta y con el motivo", status, mostrar(got))
 	}
-	if len(got.Recorrido.Pasos) != 2 {
-		t.Fatalf("recorrido = %s, want Service y endpoints", mostrar(got.Recorrido))
+	if len(got.Recorrido.Pasos) != 3 {
+		t.Fatalf("recorrido = %s, want DNS, Service y endpoints", mostrar(got.Recorrido))
 	}
 }
 

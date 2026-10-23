@@ -17,22 +17,36 @@ import (
 // el Ingress Controller usa su valor como $req_id, el último campo de cada línea del log.
 const HeaderDeRequest = "X-Request-ID"
 
-// PodQueRespondio es el pod de los endpoints del recorrido que respondió, si kviz lo puede saber:
-// cuando el body de la respuesta trae su nombre. nil si no se sabe.
-func PodQueRespondio(f foto.Foto, r Recorrido, body string) *foto.Pod {
+// Respuesta es lo que kviz sabe de una respuesta para saber qué pod la dio.
+type Respuesta struct {
+	Body string
+	// Upstream es el endpoint (`ip:puerto`) al que el Ingress Controller mandó la request, según
+	// su log; "" si no pasó por él o la línea no apareció.
+	Upstream string
+}
+
+// PodQueRespondio es el pod de los endpoints del recorrido que dio la respuesta, si kviz lo puede
+// saber: por el log del Ingress Controller (el upstream) o porque el body trae su nombre. Devuelve
+// también cómo se supo, para el detalle del paso; nil si no se sabe.
+func PodQueRespondio(f foto.Foto, r Recorrido, resp Respuesta) (*foto.Pod, string) {
+	if p := podDelUpstream(f, r, resp.Upstream); p != nil {
+		return p, "Conocido: el log del Ingress Controller dice que la mandó a " + resp.Upstream
+	}
 	var elegido *foto.Pod
 	for _, p := range podsDeLosEndpoints(f, r) {
 		// el nombre más largo gana: un pod no se confunde con otro cuyo nombre es un prefijo del suyo
-		if strings.Contains(body, p.Nombre) && (elegido == nil || len(p.Nombre) > len(elegido.Nombre)) {
+		if strings.Contains(resp.Body, p.Nombre) && (elegido == nil || len(p.Nombre) > len(elegido.Nombre)) {
 			elegido = p
 		}
 	}
-	return elegido
+	if elegido == nil {
+		return nil, ""
+	}
+	return elegido, "Conocido: el body de la respuesta trae el nombre del pod"
 }
 
-// PodDelUpstream es el pod de los endpoints del recorrido con la IP del upstream (`ip:puerto`)
-// que eligió el Ingress Controller; nil si no es ninguno.
-func PodDelUpstream(f foto.Foto, r Recorrido, upstream string) *foto.Pod {
+// podDelUpstream es el pod de los endpoints del recorrido con la IP del upstream; nil si no es ninguno.
+func podDelUpstream(f foto.Foto, r Recorrido, upstream string) *foto.Pod {
 	ip, _, err := net.SplitHostPort(upstream)
 	if err != nil {
 		return nil
@@ -45,24 +59,14 @@ func PodDelUpstream(f foto.Foto, r Recorrido, upstream string) *foto.Pod {
 	return nil
 }
 
-// ConRespuesta completa el recorrido con la respuesta: si el body dice qué pod respondió, suma el
-// salto entre nodos (si corresponde) y el pod. Si no, el recorrido termina en los endpoints posibles.
-func ConRespuesta(f foto.Foto, r Recorrido, body string) Recorrido {
-	p := PodQueRespondio(f, r, body)
+// ConRespuesta completa el recorrido con la respuesta: si se sabe qué pod la dio, suma el salto
+// entre nodos (si corresponde) y el pod. Si no, el recorrido termina en los endpoints posibles.
+func ConRespuesta(f foto.Foto, r Recorrido, resp Respuesta) Recorrido {
+	p, como := PodQueRespondio(f, r, resp)
 	if p == nil {
 		return r
 	}
-	return conPod(f, r, p, "Conocido: el body de la respuesta trae el nombre del pod")
-}
-
-// ConUpstream completa el recorrido con el upstream que el log del Ingress Controller dice que
-// eligió: el salto entre nodos (si corresponde) y el pod. Si no es un endpoint, no cambia.
-func ConUpstream(f foto.Foto, r Recorrido, upstream string) Recorrido {
-	p := PodDelUpstream(f, r, upstream)
-	if p == nil {
-		return r
-	}
-	return conPod(f, r, p, "Conocido: el log del Ingress Controller dice que la mandó a "+upstream)
+	return conPod(f, r, p, como)
 }
 
 func conPod(f foto.Foto, r Recorrido, p *foto.Pod, como string) Recorrido {

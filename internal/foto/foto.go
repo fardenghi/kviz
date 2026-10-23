@@ -13,6 +13,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
 // Foto es el estado del cluster tal como lo ve la interfaz. Viaja completa al conectarse y
@@ -35,6 +36,9 @@ type Foto struct {
 	Ingress []Ingress `json:"ingress"`
 	// Puertas ordenadas por id (nodo, puerto y protocolo).
 	Puertas []Puerta `json:"puertas"`
+	// Metricas dice si el cluster tiene metrics-server: sin él, los containers no traen su consumo
+	// (ver recursos.go) y la interfaz sugiere cómo instalarlo.
+	Metricas bool `json:"metricas"`
 	// ConfigMaps con su contenido, ordenados por id (namespace y nombre).
 	ConfigMaps []ConfigMap `json:"configMaps"`
 	// Secrets sin valores (solo sus claves), ordenados por id (namespace y nombre).
@@ -137,6 +141,9 @@ type Objetos struct {
 	Secrets        []*corev1.Secret
 	Events         []corev1.Event
 	IngressClasses []*networkingv1.IngressClass
+	// MetricsServer dice si el cluster tiene metrics-server; Metricas es lo que midió.
+	MetricsServer bool
+	Metricas      []metricsv1beta1.PodMetrics
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
@@ -151,6 +158,9 @@ func Construir(contexto string, o Objetos) Foto {
 	workloads, workloadDePod := cadenas(o)
 	f.Workloads = workloads
 	completarRollout(f.Workloads, o)
+	eventos := eventosDeProbes(o.Events, o.Pods)
+	f.Metricas = o.MetricsServer
+	consumo := consumoPorPod(o.Metricas)
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
 			ID:         p.Namespace + "/" + p.Name,
@@ -162,7 +172,7 @@ func Construir(contexto string, o Objetos) Foto {
 			IP:         opcional(p.Status.PodIP),
 			Fase:       string(p.Status.Phase),
 			Estado:     estadoPod(p),
-			Containers: containers(p),
+			Containers: containers(p, eventos[p.Namespace+"/"+p.Name], consumo[p.Namespace+"/"+p.Name]),
 			Workload:   opcional(workloadDePod[p.Namespace+"/"+p.Name]),
 			HostPorts:  hostPorts(p),
 		})
