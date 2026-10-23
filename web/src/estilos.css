@@ -170,3 +170,26 @@ g.objeto { cursor: pointer; transition: opacity .15s; }
 .logs-estado { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; }
 .logs-error { color: var(--mal); font-size: 11.5px; margin-bottom: 6px; word-break: break-word; }
 .logs { margin: 0; max-height: 320px; min-height: 60px; overflow: auto; background: var(--fondo); border-radius: 6px; padding: 6px 8px; font-family: var(--mono); font-size: 10.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-all; }
+
+/* probes y recursos (panel de detalle) */
+.salud { margin: 2px 0 10px; }
+.salud-container { margin-bottom: 3px; }
+.probe { margin: 3px 0 5px; }
+.probe-punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; box-sizing: border-box; }
+.probe-ok { background: var(--ok); }
+.probe-fallando { background: var(--mal); }
+.probe-pendiente { background: var(--aviso); }
+.probe-sin-probe { background: transparent; border: 1px solid var(--terminado); }
+.probe-estado-fallando { color: var(--mal); }
+.probe-estado-pendiente { color: var(--aviso); }
+.probe-detalle { padding-left: 13px; font-size: 11.5px; }
+.probe-fallos { padding-left: 13px; font-size: 11.5px; }
+.probe-fallos summary { cursor: pointer; color: var(--mal); }
+.probe-fallo { margin: 3px 0; }
+.medidor { display: grid; grid-template-columns: 56px 80px 1fr; align-items: center; gap: 8px; margin: 3px 0; font-size: 11.5px; }
+.medidor-barra { position: relative; height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; }
+.medidor-relleno { position: absolute; left: 0; top: 0; bottom: 0; background: var(--foco); border-radius: 4px; }
+.medidor-aviso { background: var(--aviso); }
+.medidor-mal { background: var(--mal); }
+.medidor-request { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--tinta); opacity: .45; }
+.sin-metricas { margin-top: 6px; font-size: 11.5px; }
