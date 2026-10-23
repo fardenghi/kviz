@@ -26,6 +26,8 @@ type Container struct {
 	Ready     bool   `json:"ready"`
 	Started   bool   `json:"started"`
 	Reinicios int32  `json:"reinicios"`
+	// Probes son la liveness, readiness y startup, en ese orden, con su estado (ver probes.go).
+	Probes []Probe `json:"probes"`
 }
 
 type Puerto struct {
@@ -36,16 +38,17 @@ type Puerto struct {
 }
 
 // containers devuelve los containers del pod en orden de vida: init, normales y ephemeral.
-func containers(p *corev1.Pod) []Container {
+// eventos son los events Unhealthy y Killing del pod (ver eventosDeProbes).
+func containers(p *corev1.Pod, eventos []corev1.Event) []Container {
 	var cs []Container
 	for _, c := range p.Spec.InitContainers {
-		cs = append(cs, container(ContainerInit, c.Name, c.Image, c.Ports, p.Status.InitContainerStatuses))
+		cs = append(cs, container(ContainerInit, c, p.Status.InitContainerStatuses, eventos))
 	}
 	for _, c := range p.Spec.Containers {
-		cs = append(cs, container(ContainerNormal, c.Name, c.Image, c.Ports, p.Status.ContainerStatuses))
+		cs = append(cs, container(ContainerNormal, c, p.Status.ContainerStatuses, eventos))
 	}
 	for _, c := range p.Spec.EphemeralContainers {
-		cs = append(cs, container(ContainerEphemeral, c.Name, c.Image, c.Ports, p.Status.EphemeralContainerStatuses))
+		cs = append(cs, container(ContainerEphemeral, corev1.Container(c.EphemeralContainerCommon), p.Status.EphemeralContainerStatuses, eventos))
 	}
 	if cs == nil {
 		return []Container{}
@@ -53,20 +56,23 @@ func containers(p *corev1.Pod) []Container {
 	return cs
 }
 
-func container(tipo, nombre, imagen string, puertos []corev1.ContainerPort, estados []corev1.ContainerStatus) Container {
-	c := Container{Nombre: nombre, Tipo: tipo, Imagen: imagen, Puertos: []Puerto{}, Estado: "Waiting"}
-	for _, p := range puertos {
+func container(tipo string, spec corev1.Container, estados []corev1.ContainerStatus, eventos []corev1.Event) Container {
+	c := Container{Nombre: spec.Name, Tipo: tipo, Imagen: spec.Image, Puertos: []Puerto{}, Estado: "Waiting"}
+	for _, p := range spec.Ports {
 		c.Puertos = append(c.Puertos, Puerto{Numero: p.ContainerPort, Nombre: p.Name, Protocolo: protocolo(p.Protocol)})
 	}
-	for _, s := range estados {
-		if s.Name != nombre {
+	var estado *corev1.ContainerStatus
+	for i, s := range estados {
+		if s.Name != spec.Name {
 			continue
 		}
+		estado = &estados[i]
 		c.Estado = estadoContainer(s.State)
 		c.Ready = s.Ready
 		c.Started = s.Started != nil && *s.Started
 		c.Reinicios = s.RestartCount
 	}
+	c.Probes = probesDe(&spec, c, estado, eventos)
 	return c
 }
 

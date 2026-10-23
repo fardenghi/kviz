@@ -121,6 +121,8 @@ type Objetos struct {
 	Services       []*corev1.Service
 	EndpointSlices []*discoveryv1.EndpointSlice
 	Ingress        []*networkingv1.Ingress
+	// Events del cluster (por ahora, de ellos salen los fallos de las probes).
+	Events []corev1.Event
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
@@ -135,6 +137,7 @@ func Construir(contexto string, o Objetos) Foto {
 	workloads, workloadDePod := cadenas(o)
 	f.Workloads = workloads
 	completarRollout(f.Workloads, o)
+	eventos := eventosDeProbes(o.Events, o.Pods)
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
 			ID:         p.Namespace + "/" + p.Name,
@@ -146,7 +149,7 @@ func Construir(contexto string, o Objetos) Foto {
 			IP:         opcional(p.Status.PodIP),
 			Fase:       string(p.Status.Phase),
 			Estado:     estadoPod(p),
-			Containers: containers(p),
+			Containers: containers(p, eventos[p.Namespace+"/"+p.Name]),
 			Workload:   opcional(workloadDePod[p.Namespace+"/"+p.Name]),
 			HostPorts:  hostPorts(p),
 		})
