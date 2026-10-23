@@ -9,7 +9,9 @@ import { Lienzo } from './lienzo/Lienzo';
 const REINTENTO_MS = 2000;
 
 export function App() {
-  const [foto, setFoto] = useState<Foto | null>(null);
+  // la foto anterior va a la escena para marcar lo que cambió (reinicios que aumentaron)
+  const [{ foto, fotoAnterior }, setFotos] = useState<{ foto: Foto | null; fotoAnterior?: Foto }>({ foto: null });
+  const setFoto = (f: Foto) => setFotos((s) => ({ foto: f, fotoAnterior: s.foto ?? undefined }));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +38,10 @@ export function App() {
     };
   }, []);
 
-  const escena = useMemo(() => (foto?.conectado ? construirEscena(foto) : null), [foto]);
+  const escena = useMemo(
+    () => (foto?.conectado ? construirEscena(foto, { fotoAnterior }) : null),
+    [foto, fotoAnterior],
+  );
 
   return (
     <div className="app">

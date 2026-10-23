@@ -36,6 +36,11 @@ type Pod struct {
 	IP *string `json:"ip"`
 	// Fase es status.phase: Pending, Running, Succeeded, Failed o Unknown.
 	Fase string `json:"fase"`
+	// Estado es la columna STATUS de kubectl get pods: Running, Init:0/1, CrashLoopBackOff,
+	// Completed, Terminating…
+	Estado string `json:"estado"`
+	// Containers en orden de vida: init, normales y ephemeral.
+	Containers []Container `json:"containers"`
 }
 
 // Objetos son los objetos de Kubernetes de los que sale la foto.
@@ -55,11 +60,13 @@ func Construir(contexto string, o Objetos) Foto {
 
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
-			Nombre:    p.Name,
-			Namespace: p.Namespace,
-			Nodo:      opcional(p.Spec.NodeName),
-			IP:        opcional(p.Status.PodIP),
-			Fase:      string(p.Status.Phase),
+			Nombre:     p.Name,
+			Namespace:  p.Namespace,
+			Nodo:       opcional(p.Spec.NodeName),
+			IP:         opcional(p.Status.PodIP),
+			Fase:       string(p.Status.Phase),
+			Estado:     estadoPod(p),
+			Containers: containers(p),
 		})
 	}
 	sort.Slice(f.Pods, func(i, j int) bool {

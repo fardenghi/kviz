@@ -52,6 +52,13 @@ export function Lienzo({ escena }: { escena: Escena }) {
       onMouseLeave={() => (arrastre.current = null)}
     >
       <svg className="lienzo-svg">
+        <defs>
+          {/* relleno rayado de los ephemeral containers (kubectl debug) */}
+          <pattern id="rayado" width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width={4} height={4} className="rayado-fondo" />
+            <line x1={0} y1={0} x2={0} y2={4} className="rayado-linea" />
+          </pattern>
+        </defs>
         <g transform={`translate(${vista.x},${vista.y}) scale(${vista.escala})`}>
           {escena.regiones.map((r) => (
             <Region key={r.id} region={r} />
@@ -81,21 +88,49 @@ function Region({ region: r }: { region: RegionEnEscena }) {
   );
 }
 
-// recorta el nombre para que entre en la tarjeta (aprox. 6.8 px por letra a 11.5 px, negrita)
-const recortar = (texto: string, ancho: number) => {
-  const max = Math.floor((ancho - 22) / 6.8);
-  return texto.length > max ? texto.slice(0, max - 1) + '…' : texto;
-};
-
 function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
   return (
     <g>
-      <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={8} className="pod" />
-      <text x={p.x + 13} y={p.y + 20} className="pod-nombre">
-        {recortar(p.nombre, p.ancho)}
+      <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={8} className={p.tonoEstado === 'mal' ? 'pod pod-mal' : 'pod'} />
+      <text x={p.x + 13} y={p.y + 18} className="pod-nombre">
+        {p.nombreVisible}
         <title>{`${p.nombre} · namespace ${p.namespace}`}</title>
       </text>
-      <text x={p.x + 13} y={p.y + 36} className="mono tenue">{p.ip ?? 'sin IP'}</text>
+      {p.estado && (
+        <text x={p.x + p.ancho - 8} y={p.y + 18} className={`pod-estado tono-${p.tonoEstado}`}>
+          {p.estado}
+        </text>
+      )}
+      <text x={p.x + 13} y={p.y + 33} className="mono tenue">{p.ip ?? 'sin IP'}</text>
+      {p.containers.map((c, i) => (
+        <g key={c.nombre || `+${i}`}>
+          <rect
+            x={c.x}
+            y={c.y}
+            width={c.ancho}
+            height={c.alto}
+            rx={3}
+            className={`chip chip-${c.tipo ?? 'resto'}${c.noListo ? ' chip-no-listo' : ''}`}
+          />
+          <text x={c.x + c.ancho / 2} y={c.y + 10.5} className="chip-texto">{c.texto}</text>
+          <title>{c.detalle}</title>
+        </g>
+      ))}
+      {p.reinicios !== null && (
+        <Reinicios key={p.reinicios} x={p.x + p.ancho - 8} y={p.y + 52} n={p.reinicios} titila={p.reiniciosTitilan} />
+      )}
     </g>
+  );
+}
+
+// Se monta de nuevo con cada número (key), así la animación arranca cada vez que los reinicios
+// aumentan; guarda el "titila" del montaje para que la foto siguiente no la corte a la mitad.
+function Reinicios({ x, y, n, titila }: { x: number; y: number; n: number; titila: boolean }) {
+  const [titilando] = useState(titila);
+  return (
+    <text x={x} y={y} className={titilando ? 'reinicios titila' : 'reinicios'}>
+      ↻ {n}
+      <title>{`${n} reinicios`}</title>
+    </text>
   );
 }

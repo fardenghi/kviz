@@ -11,6 +11,8 @@ const pod = (nombre: string, nodo: string | null, ip: string | null = '10.244.0.
   nodo,
   ip,
   fase: nodo ? 'Running' : 'Pending',
+  estado: nodo ? 'Running' : 'Pending',
+  containers: [],
 });
 const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], ...parte });
 

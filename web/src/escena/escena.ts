@@ -1,10 +1,13 @@
 // Escena de la vista de topología (módulo 1 del frontend): función pura de foto + estado de la
 // interfaz a escena. Decide qué se dibuja, dónde y con qué texto; el lienzo solo la pinta.
 import type { Foto, Pod } from '../foto';
+import { type MarcasPod, marcasDePod } from './marcas-pod';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface EstadoInterfaz {}
+export interface EstadoInterfaz {
+  /** La foto que se dibujó antes de esta, para marcar lo que cambió (reinicios que aumentaron). */
+  fotoAnterior?: Foto;
+}
 
 export interface Caja {
   x: number;
@@ -21,7 +24,7 @@ export interface RegionEnEscena extends Caja {
   subtitulo: string;
 }
 
-export interface PodEnEscena extends Caja {
+export interface PodEnEscena extends Caja, MarcasPod {
   /** `pod:<namespace>/<nombre>`: único en todo el cluster. */
   id: string;
   nombre: string;
@@ -53,8 +56,9 @@ export const idPod = (p: Pick<Pod, 'namespace' | 'nombre'>) => `pod:${p.namespac
 
 export const SIN_NODO = 'sin-nodo';
 
-export function construirEscena(foto: Foto, _estado: EstadoInterfaz = {}): Escena {
+export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena {
   const M = MEDIDAS;
+  const anteriores = new Map((estado.fotoAnterior?.pods ?? []).map((p) => [idPod(p), p]));
   const regiones: RegionEnEscena[] = [];
   const pods: PodEnEscena[] = [];
 
@@ -80,16 +84,20 @@ export function construirEscena(foto: Foto, _estado: EstadoInterfaz = {}): Escen
     const alto = M.cabecera + filas * (M.altoPod + M.hueco) - M.hueco + M.relleno;
     regiones.push({ ...g, x, y, ancho: anchoRegion, alto });
     suyos.forEach((p, i) => {
+      const tarjeta = {
+        x: x + M.relleno + (i % M.columnas) * (M.anchoPod + M.hueco),
+        y: y + M.cabecera + Math.floor(i / M.columnas) * (M.altoPod + M.hueco),
+        ancho: M.anchoPod,
+        alto: M.altoPod,
+      };
       pods.push({
         id: idPod(p),
         nombre: p.nombre,
         namespace: p.namespace,
         ip: p.ip,
         region: g.id,
-        x: x + M.relleno + (i % M.columnas) * (M.anchoPod + M.hueco),
-        y: y + M.cabecera + Math.floor(i / M.columnas) * (M.altoPod + M.hueco),
-        ancho: M.anchoPod,
-        alto: M.altoPod,
+        ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
+        ...tarjeta,
       });
     });
     x += anchoRegion + M.separacionNodos;
