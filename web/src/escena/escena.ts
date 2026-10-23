@@ -4,6 +4,8 @@ import type { Foto, Ingress, Pod, Puerta, PuertoService, ReglaIngress, Service, 
 import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWorkload } from './workloads';
 import { type MarcasPod, marcasDePod } from './marcas-pod';
 import { aplicarFoco } from './foco';
+import { aplicarRecorrido } from './recorrido';
+import type { Recorrido } from '../prueba';
 import { advertenciasPorObjeto, titulosDe } from './advertencias';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
@@ -30,6 +32,11 @@ export interface EstadoInterfaz {
   hover?: string | null;
   /** id de escena del objeto seleccionado. Si es un Service, pod, Ingress o puerta, es el foco. */
   seleccionado?: string | null;
+  /**
+   * Recorrido de la request de prueba que se está mirando (ver recorrido.ts). Si tiene pasos, manda
+   * sobre todo lo demás: apaga el foco y atenúa lo que no participa.
+   */
+  recorrido?: Recorrido | null;
 }
 
 export interface Caja {
@@ -50,6 +57,12 @@ export interface MarcasDeFoco {
   opacidad: number;
 }
 
+/** Cómo marca el recorrido a un objeto (ver recorrido.ts); su opacidad va en MarcasDeFoco. */
+export interface MarcasDeRecorrido {
+  /** Números de los pasos del recorrido en los que participa (rosas, arriba a la izquierda); vacío si no participa. */
+  pasos: number[];
+}
+
 export interface RegionEnEscena extends Caja {
   id: string;
   /** Nombre del nodo, o null para la región "Sin nodo asignado". */
@@ -64,7 +77,7 @@ export interface MarcaDeAdvertencia {
   advertencias: string[];
 }
 
-export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcaDeAdvertencia {
+export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcaDeAdvertencia, MarcasDeRecorrido {
   /** `pod:<namespace>/<nombre>`: único en todo el cluster. */
   id: string;
   nombre: string;
@@ -84,7 +97,7 @@ export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcaDeAdver
   opacidad: number;
 }
 
-export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia {
+export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia, MarcasDeRecorrido {
   /** `service:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -95,7 +108,7 @@ export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia 
   puertos: string[];
 }
 
-export interface IngressEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia {
+export interface IngressEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia, MarcasDeRecorrido {
   /** `ingress:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -107,7 +120,7 @@ export interface IngressEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia 
 }
 
 /** Puerta: pestaña en el borde de arriba de un nodo, para un NodePort o un hostPort. */
-export interface PuertaEnEscena extends Caja, MarcasDeFoco {
+export interface PuertaEnEscena extends Caja, MarcasDeFoco, MarcasDeRecorrido {
   /** `puerta:<nodo>/<puerto>`, con `/<protocolo>` si no es TCP. */
   id: string;
   nodo: string;
@@ -126,9 +139,11 @@ export interface PuertaEnEscena extends Caja, MarcasDeFoco {
 /**
  * Tono de una conexión. En reposo: `reposo`, o `no-listo` hacia un endpoint no listo. Con foco:
  * `foco` (azul, con flecha) entre relacionados y `fantasma` (casi invisible) el resto; con un
- * workload seleccionado, `fantasma` las que no van a sus pods. Ver foco.ts.
+ * workload seleccionado, `fantasma` las que no van a sus pods. Ver foco.ts. Con un recorrido:
+ * `recorrido` (rosa, discontinua y animada) entre objetos del recorrido y `fantasma` el resto
+ * (ver recorrido.ts).
  */
-export type TonoConexion = 'reposo' | 'no-listo' | 'foco' | 'fantasma';
+export type TonoConexion = 'reposo' | 'no-listo' | 'foco' | 'fantasma' | 'recorrido';
 
 export interface Punto {
   x: number;
@@ -297,6 +312,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         region: g.id,
         nuevo: estado.podsNuevos?.has(idPod(p)) ?? false,
         resaltado: false,
+        pasos: [],
         ...terminando(p, seleccionDeWorkload(p, seleccionado)),
         workload: marcaDeWorkload(p, workloads),
         ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
@@ -360,6 +376,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
       alto: M.altoPuerta,
       resaltado: false,
       opacidad: 1,
+      pasos: [],
     })),
   );
 
@@ -377,7 +394,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const cajas: Caja[] = [...regiones, ...ingress, ...services];
   const ancho = Math.max(0, ...cajas.map((c) => c.x + c.ancho));
   const alto = Math.max(0, ...cajas.map((c) => c.y + c.alto));
-  return aplicarFoco({ ancho, alto, regiones, pods, services, ingress, puertas, conexiones, foco: null, relacionados: [] }, estado, delWorkload);
+  const escena = aplicarFoco({ ancho, alto, regiones, pods, services, ingress, puertas, conexiones, foco: null, relacionados: [] }, estado, delWorkload);
+  return aplicarRecorrido(escena, foto, estado);
 }
 
 const ordenPuertas = (a: Puerta, b: Puerta) =>
@@ -443,6 +461,7 @@ function ubicarIngress(visibles: Ingress[], services: ServiceEnEscena[], finEsce
       alto: M.altoIngress + (reglas.length - 1) * M.altoReglaIngress,
       resaltado: false,
       opacidad: 1,
+      pasos: [],
       advertencias: [],
     });
   };
@@ -540,6 +559,7 @@ function ubicarServices(visibles: Service[], pods: PodEnEscena[], finRegiones: n
       alto: M.altoService,
       resaltado: false,
       opacidad: 1,
+      pasos: [],
       advertencias: [],
     });
   };

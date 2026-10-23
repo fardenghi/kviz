@@ -30,23 +30,24 @@ func (kubeconfigDeKubectl) Contextos() (string, []string, error) {
 }
 
 func (kubeconfigDeKubectl) Cliente(contexto string) (kubernetes.Interface, error) {
-	config, err := configDe(contexto)
+	cfg, err := ConfigDeKubectl(contexto)
 	if err != nil {
 		return nil, err
 	}
-	return kubernetes.NewForConfig(config)
+	return kubernetes.NewForConfig(cfg)
 }
 
 func (kubeconfigDeKubectl) Metricas(contexto string) (Metricas, error) {
-	config, err := configDe(contexto)
+	cfg, err := ConfigDeKubectl(contexto)
 	if err != nil {
 		return nil, err
 	}
-	return metricasDe(config)
+	return metricasDe(cfg)
 }
 
-// configDe lee del kubeconfig cómo hablarle al cluster del contexto.
-func configDe(contexto string) (*rest.Config, error) {
+// ConfigDeKubectl es la configuración de la API del cluster de un contexto del kubeconfig de
+// kubectl (la usa el pod de sondeo para hacer exec, como kubectl exec, y las métricas).
+func ConfigDeKubectl(contexto string) (*rest.Config, error) {
 	crudo, err := clientcmd.NewDefaultClientConfigLoadingRules().Load()
 	if err != nil {
 		return nil, fmt.Errorf("no se pudo leer el kubeconfig: %w", err)
@@ -54,9 +55,9 @@ func configDe(contexto string) (*rest.Config, error) {
 	if _, ok := crudo.Contexts[contexto]; !ok {
 		return nil, fmt.Errorf("%w: %q (¿se borró el cluster?)", ErrContextoInexistente, contexto)
 	}
-	config, err := clientcmd.NewNonInteractiveClientConfig(*crudo, contexto, &clientcmd.ConfigOverrides{}, nil).ClientConfig()
+	cfg, err := clientcmd.NewNonInteractiveClientConfig(*crudo, contexto, &clientcmd.ConfigOverrides{}, nil).ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("el contexto %q no sirve: %w", contexto, err)
 	}
-	return config, nil
+	return cfg, nil
 }

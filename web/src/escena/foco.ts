@@ -2,6 +2,7 @@
 // selecciona. Sus relacionados se calculan sobre la escena ya ubicada (conexiones y destinos de
 // puertas), así solo cuentan los objetos que se ven.
 import type { ConexionEnEscena, Escena, EstadoInterfaz, MarcasDeFoco, TonoConexion } from './escena';
+import { hayRecorrido } from './recorrido';
 
 /** Opacidad de los objetos sin relación con el foco mientras hay hover. */
 export const OPACIDAD_ACLARADO = 0.45;
@@ -11,8 +12,12 @@ const TIPOS_CON_FOCO = ['service', 'pod', 'ingress', 'puerta'];
 
 const tipoDe = (id: string) => id.slice(0, id.indexOf(':'));
 
-/** El foco: el hover manda sobre la selección. Un id que no está en la escena no es foco. */
+/**
+ * El foco: el hover manda sobre la selección. Un id que no está en la escena no es foco. Mientras
+ * hay un recorrido no hay foco (un clic solo abre el panel de detalle).
+ */
 export function focoDe(escena: Escena, estado: EstadoInterfaz): { foco: string | null; porHover: boolean } {
+  if (hayRecorrido(estado)) return { foco: null, porHover: false };
   const enEscena = (id: string | null | undefined): id is string =>
     !!id &&
     TIPOS_CON_FOCO.includes(tipoDe(id)) &&
@@ -58,12 +63,12 @@ export function relacionadosCon(escena: Escena, foco: string | null): Set<string
 }
 
 /**
- * Las líneas de puerta solo aparecen con foco, cuando la puerta y su destino están relacionados
- * (tres puertas al mismo Service llenarían el diagrama de líneas). NodePort: de arriba de la
+ * Las líneas de puerta solo aparecen con foco o durante un recorrido, cuando la puerta y su destino
+ * están en `rel` (tres puertas al mismo Service llenarían el diagrama de líneas). NodePort: de arriba de la
  * puerta al borde de abajo del Service, corrida a la derecha del centro para no pisar las otras
  * líneas. hostPort: de abajo de la puerta a arriba de su pod.
  */
-function lineasDePuerta(escena: Escena, rel: Set<string>): ConexionEnEscena[] {
+export function lineasDePuerta(escena: Escena, rel: Set<string>, tono: TonoConexion = 'foco'): ConexionEnEscena[] {
   const cajas = new Map([...escena.services, ...escena.pods].map((c) => [c.id, c]));
   return escena.puertas.flatMap((p) => {
     const destino = cajas.get(p.destino);
@@ -74,7 +79,7 @@ function lineasDePuerta(escena: Escena, rel: Set<string>): ConexionEnEscena[] {
         id: `${p.id}->${p.destino}`,
         desde: p.id,
         hasta: p.destino,
-        tono: 'foco' as const,
+        tono,
         dePuerta: true,
         inicio: { x: p.x + p.ancho / 2, y: haciaService ? p.y : p.y + p.alto },
         fin: haciaService

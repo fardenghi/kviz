@@ -1,6 +1,7 @@
 // Cliente de la API de kviz. La interfaz no habla nunca directo con Kubernetes.
 import type { Foto } from './foto';
 import type { Mensaje } from './tiempoReal';
+import type { PedidoDePrueba, Prueba } from './prueba';
 
 export async function pedirFoto(): Promise<Foto> {
   const res = await fetch('/api/foto');
@@ -73,6 +74,20 @@ export async function pedirComandos(o: { tipo: string; namespace: string; nombre
   const q = new URLSearchParams({ tipo: o.tipo, namespace: o.namespace, nombre: o.nombre });
   const res = await fetch(`/api/comandos?${q}`);
   if (!res.ok) throw new Error(`GET /api/comandos respondió ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Manda una request de prueba (POST /api/pruebas): sale del pod de sondeo del cluster (la primera
+ * vez kviz lo crea, y puede tardar mientras el nodo baja la imagen). Devuelve la respuesta y el recorrido.
+ */
+export async function mandarPrueba(pedido: PedidoDePrueba): Promise<Prueba> {
+  const res = await fetch('/api/pruebas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pedido),
+  });
+  if (!res.ok) throw new Error((await res.text()).trim() || `POST /api/pruebas respondió ${res.status}`);
   return res.json();
 }
 

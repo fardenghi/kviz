@@ -5,6 +5,9 @@ import { detalleDe, idDeWorkload } from './detalle/detalle';
 import { PanelDeDetalle } from './detalle/PanelDeDetalle';
 import { Lienzo } from './lienzo/Lienzo';
 import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
+import { FormularioDePrueba } from './superficies/FormularioDePrueba';
+import { TarjetaDelRecorrido } from './superficies/TarjetaDelRecorrido';
+import type { Prueba } from './prueba';
 import { FranjaDeEvents } from './superficies/FranjaDeEvents';
 import { eventsDeLaFranja } from './events';
 import { EN_VIVO_INICIAL, type EnVivo, finDelBrillo, podsNuevos, recibir } from './tiempoReal';
@@ -25,6 +28,12 @@ export function App() {
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   // contextos de kubectl para el selector; se vuelven a pedir al abrirlo y cuando cambia la conexión
   const [contextos, setContextos] = useState<string[]>([]);
+  // formulario de request de prueba abierto (con su destino inicial; `vez` lo vuelve a montar), la
+  // última prueba, y si su recorrido se está mirando (mientras tanto el foco está apagado)
+  const [formulario, setFormulario] = useState<{ destino: string; vez: number } | null>(null);
+  const [prueba, setPrueba] = useState<Prueba | null>(null);
+  const [verRecorrido, setVerRecorrido] = useState(false);
+  const probar = (destino: string) => setFormulario((f) => ({ destino, vez: (f?.vez ?? 0) + 1 }));
   const [errorContexto, setErrorContexto] = useState<string | null>(null);
   const refrescarContextos = () =>
     pedirContextos()
@@ -59,6 +68,8 @@ export function App() {
     setNamespace(null);
     setWorkload(null);
     setSeleccionado(null);
+    setPrueba(null);
+    setVerRecorrido(false);
     cambiarContexto(nombre).catch((e: Error) => setErrorContexto(e.message));
   };
   // el contexto de kviz va siempre en el selector, aunque su cluster se haya borrado del kubeconfig
@@ -78,6 +89,7 @@ export function App() {
   );
   // si el workload seleccionado se borra o queda oculto por los filtros, se deselecciona
   const workloadSeleccionado = workload !== null && workloads.some((w) => w.id === workload) ? workload : null;
+  const recorrido = verRecorrido && prueba ? prueba.recorrido : null;
   const escena = useMemo(
     () =>
       foto?.conectado
@@ -88,10 +100,11 @@ export function App() {
             workloadSeleccionado,
             hover,
             seleccionado,
+            recorrido,
             podsNuevos: podsNuevos(enVivo, Date.now()),
           })
         : null,
-    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado], // eslint-disable-line react-hooks/exhaustive-deps
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado, recorrido], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // el panel muestra el objeto mientras siga en la foto; si se borra, se cierra solo
@@ -154,6 +167,9 @@ export function App() {
               <input type="checkbox" checked={mostrarSistema} onChange={(e) => setMostrarSistema(e.target.checked)} />
               namespaces del sistema
             </label>
+            <button className="boton" onClick={() => probar('')} title="Request de prueba a cualquier URL interna">
+              Request de prueba
+            </button>
           </>
         )}
       </header>
@@ -172,8 +188,22 @@ export function App() {
           alClicEnObjeto={setSeleccionado}
         >
           <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={elegirWorkload} />
+          {formulario && (
+            <FormularioDePrueba
+              key={formulario.vez}
+              destinoInicial={formulario.destino}
+              alResponder={(p) => {
+                setPrueba(p);
+                setVerRecorrido(true);
+              }}
+              alCerrar={() => setFormulario(null)}
+            />
+          )}
+          {recorrido && recorrido.pasos.length > 0 && prueba && (
+            <TarjetaDelRecorrido prueba={prueba} alCerrar={() => setVerRecorrido(false)} />
+          )}
           {detalle && foto && (
-            <PanelDeDetalle detalle={detalle} foto={foto} abrir={abrir} alCerrar={() => setSeleccionado(null)} />
+            <PanelDeDetalle detalle={detalle} foto={foto} abrir={abrir} probar={probar} alCerrar={() => setSeleccionado(null)} />
           )}
         </Lienzo>
       )}

@@ -24,11 +24,14 @@ export function PanelDeDetalle({
   detalle,
   foto,
   abrir,
+  probar,
   alCerrar,
 }: {
   detalle: Detalle;
   foto: Foto;
   abrir: (id: string) => void;
+  /** Abre el formulario de request de prueba con el destino ya completado. */
+  probar?: (destino: string) => void;
   alCerrar: () => void;
 }) {
   const { tipo, nombre } = titulo(detalle);
@@ -44,7 +47,7 @@ export function PanelDeDetalle({
         </button>
       </div>
       {SECCIONES.map(({ clave, Seccion }) => (
-        <Seccion key={clave} detalle={detalle} foto={foto} abrir={abrir} />
+        <Seccion key={clave} detalle={detalle} foto={foto} abrir={abrir} probar={probar} />
       ))}
     </aside>
   );
