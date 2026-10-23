@@ -277,9 +277,13 @@ function terminando<T extends { opacidad: number }>(p: Pod, marcas: T): T & { te
   return { ...marcas, terminando, opacidad: terminando ? Math.min(marcas.opacidad, OPACIDAD_TERMINANDO) : marcas.opacidad };
 }
 
-/** Namespaces que ofrece el filtro: los que tienen pods, sin los del sistema mientras están ocultos. */
+/**
+ * Namespaces que ofrece el filtro: los del cluster (también los que no tienen pods) y los de los
+ * pods, sin los del sistema mientras están ocultos.
+ */
 export function namespacesDelFiltro(foto: Foto, estado: EstadoInterfaz = {}): string[] {
-  const nombres = new Set(foto.pods.map((p) => p.namespace).filter((ns) => pasaElInterruptor(ns, estado)));
+  const todos = [...(foto.namespaces ?? []).map((n) => n.nombre), ...foto.pods.map((p) => p.namespace)];
+  const nombres = new Set(todos.filter((ns) => pasaElInterruptor(ns, estado)));
   return [...nombres].sort();
 }
 

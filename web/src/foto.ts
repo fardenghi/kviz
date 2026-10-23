@@ -1,8 +1,8 @@
 // Contrato de la foto del cluster, tal como la entrega GET /api/foto y el stream (ver tiempoReal.ts).
 // Es el espejo de internal/foto/foto.go: si se agrega un campo allá, se agrega acá.
 // Cada objeto de una lista lleva un `id` único en su lista, y las listas van ordenadas por id.
-// (*) Los campos que solo usa el panel de detalle son opcionales acá para que los fixtures de la
-// escena no tengan que llevarlos; el backend los manda siempre.
+// (*) Los campos que solo usan el panel de detalle (o el filtro por namespace) son opcionales acá
+// para que los fixtures de la escena no tengan que llevarlos; el backend los manda siempre.
 
 export interface Foto {
   /** Contexto de kubectl de kviz, por ejemplo "kind-lab"; "" si kubectl no tiene contexto. */
@@ -11,6 +11,11 @@ export interface Foto {
   conectado: boolean;
   /** Por qué kviz está desconectado, en español. */
   motivo?: string;
+  /**
+   * Namespaces del cluster, con o sin pods, ordenados por id (el nombre). Los usa el filtro por
+   * namespace (*).
+   */
+  namespaces?: Namespace[];
   /** Ordenados por id (el nombre). */
   nodos: Nodo[];
   /** Ordenados por id (namespace y nombre). */
@@ -42,6 +47,12 @@ export interface Foto {
    * para que los fixtures de la escena no tengan que llevarla.
    */
   advertencias?: Advertencia[];
+}
+
+export interface Namespace {
+  /** El nombre. */
+  id: string;
+  nombre: string;
 }
 
 /**

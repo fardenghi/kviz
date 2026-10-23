@@ -93,13 +93,13 @@ kviz shows "desconectado" and reconnects by itself when it comes back.
 kviz uses the credentials of your kubectl context. It is **read-only**, with one exception: the probe
 pod used to send test requests.
 
-- **Reads** (get, list, watch), cluster-wide: nodes, pods, pod logs, Services,
+- **Reads** (get, list, watch), cluster-wide: namespaces, nodes, pods, pod logs, Services,
   EndpointSlices, Ingresses, IngressClasses, Deployments, ReplicaSets, StatefulSets, DaemonSets,
   Jobs, CronJobs, ConfigMaps, Secrets and events; and pod metrics from `metrics.k8s.io` if available.
   Secrets travel to the UI with their keys only; a value leaves kviz only when you click "Revelar"
   on it.
 - **Writes**, only the first time you send a test request: kviz creates the `kviz-system` namespace
-  if it doesn't exist (it only reads that one namespace), creates one pod there (`curlimages/curl`), and runs `curl` in it with
+  if it doesn't exist, creates one pod there (`curlimages/curl`), and runs `curl` in it with
   `pods/exec`. The pod is deleted when kviz exits or switches context. If kviz was killed abruptly,
   it reuses or deletes the leftover pod the next time it starts.
 

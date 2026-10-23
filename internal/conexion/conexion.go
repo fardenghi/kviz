@@ -42,6 +42,7 @@ type Conexion struct {
 
 	sincronizada atomic.Bool
 	avisos       *avisos
+	namespaces   listerscorev1.NamespaceLister
 	nodos        listerscorev1.NodeLister
 	pods         listerscorev1.PodLister
 	deployments  listersappsv1.DeploymentLister
@@ -73,6 +74,8 @@ func (c *Conexion) Contexto() string { return c.contexto }
 // Los informers viven hasta que se cancela ctx.
 func (c *Conexion) Iniciar(ctx context.Context) error {
 	fabrica := informers.NewSharedInformerFactory(c.cliente, 0)
+	namespaces := fabrica.Core().V1().Namespaces()
+	c.namespaces = namespaces.Lister()
 	nodos := fabrica.Core().V1().Nodes()
 	pods := fabrica.Core().V1().Pods()
 	c.nodos = nodos.Lister()
@@ -99,7 +102,7 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 
 	// cada alta, modificación o baja de un objeto observado avisa al stream
 	for _, inf := range []cache.SharedIndexInformer{
-		nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(), ingress.Informer(),
+		namespaces.Informer(), nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(), ingress.Informer(),
 		apps.Deployments().Informer(), apps.ReplicaSets().Informer(), apps.StatefulSets().Informer(),
 		apps.DaemonSets().Informer(), batch.Jobs().Informer(), batch.CronJobs().Informer(),
 		clases.Informer(),
@@ -136,6 +139,7 @@ func (c *Conexion) Objetos() foto.Objetos {
 	slices, _ := c.slices.List(labels.Everything())
 	ingress, _ := c.ingress.List(labels.Everything())
 	o := foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices, Ingress: ingress}
+	o.Namespaces, _ = c.namespaces.List(labels.Everything())
 	o.Deployments, _ = c.deployments.List(labels.Everything())
 	o.ReplicaSets, _ = c.replicaSets.List(labels.Everything())
 	o.StatefulSets, _ = c.statefulSets.List(labels.Everything())

@@ -26,8 +26,10 @@ type Foto struct {
 	Conectado bool `json:"conectado"`
 	// Motivo explica, en español, por qué kviz está desconectado.
 	Motivo string `json:"motivo,omitempty"`
-	Nodos  []Nodo `json:"nodos"`
-	Pods   []Pod  `json:"pods"`
+	// Namespaces del cluster ordenados por id (el nombre), con o sin pods (ver namespaces.go).
+	Namespaces []Namespace `json:"namespaces"`
+	Nodos      []Nodo      `json:"nodos"`
+	Pods       []Pod       `json:"pods"`
 	// Workloads son los workloads de arriba de cada cadena de dueños (ver workloads.go), ordenados por id.
 	Workloads []Workload `json:"workloads"`
 	// Services ordenados por id (namespace y nombre).
@@ -125,6 +127,7 @@ type Endpoint struct {
 
 // Objetos son los objetos de Kubernetes de los que sale la foto.
 type Objetos struct {
+	Namespaces     []*corev1.Namespace
 	Nodos          []*corev1.Node
 	Pods           []*corev1.Pod
 	Deployments    []*appsv1.Deployment
@@ -149,7 +152,7 @@ type Objetos struct {
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
 // (nodos por nombre, pods por namespace y nombre), así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
-	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Workloads: []Workload{}, Ingress: ingresses(o), Advertencias: []Advertencia{}}
+	f := Foto{Contexto: contexto, Conectado: true, Namespaces: namespaces(o), Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Workloads: []Workload{}, Ingress: ingresses(o), Advertencias: []Advertencia{}}
 	for _, n := range o.Nodos {
 		f.Nodos = append(f.Nodos, Nodo{ID: n.Name, Nombre: n.Name, InternalIP: internalIP(n), Capacidad: capacidadDe(n)})
 	}
@@ -187,7 +190,7 @@ func Construir(contexto string, o Objetos) Foto {
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	f := Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}, Events: []Event{}, Advertencias: []Advertencia{}}
+	f := Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Namespaces: []Namespace{}, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}, Events: []Event{}, Advertencias: []Advertencia{}}
 	f.ConfigMaps, f.Secrets = []ConfigMap{}, []Secret{}
 	return f
 }

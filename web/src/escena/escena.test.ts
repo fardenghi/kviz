@@ -183,6 +183,20 @@ describe('filtros de namespace', () => {
     ]);
   });
 
+  it('el filtro ofrece también los namespaces del cluster que no tienen pods', () => {
+    const f = { ...lab(), namespaces: ['default', 'datos', 'vacio', 'kube-system', 'kviz-system'].map((n) => ({ id: n, nombre: n })) };
+
+    expect(namespacesDelFiltro(f, {})).toEqual(['datos', 'default', 'vacio']);
+    expect(namespacesDelFiltro(f, { mostrarSistema: true })).toEqual([
+      'datos',
+      'default',
+      'ingress-nginx',
+      'kube-system',
+      'local-path-storage',
+      'vacio',
+    ]);
+  });
+
   it('un pod del recorrido se ve aunque los filtros lo oculten, salvo en kviz-system', () => {
     const ic = 'pod:ingress-nginx/ingress-nginx-controller-5c9f8';
     const sondeo = 'pod:kviz-system/kviz-sondeo';
