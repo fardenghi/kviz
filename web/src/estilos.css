@@ -146,3 +146,11 @@ g.objeto { cursor: pointer; transition: opacity .15s; }
 .comando-linea { display: flex; align-items: center; gap: 6px; background: var(--fondo); border-radius: 6px; padding: 4px 6px; }
 .comando-linea code { flex: 1; font-family: var(--mono); font-size: 11px; word-break: break-all; user-select: all; }
 .comando-linea .boton { flex: none; }
+
+/* logs de un container (panel de detalle) */
+.logs-controles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.logs-cual { display: inline-flex; gap: 2px; }
+.logs-cual .boton[aria-pressed="true"] { border-color: var(--foco); color: var(--foco); }
+.logs-estado { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; }
+.logs-error { color: var(--mal); font-size: 11.5px; margin-bottom: 6px; word-break: break-word; }
+.logs { margin: 0; max-height: 320px; min-height: 60px; overflow: auto; background: var(--fondo); border-radius: 6px; padding: 6px 8px; font-family: var(--mono); font-size: 10.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-all; }

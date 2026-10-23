@@ -45,7 +45,7 @@ sirve una página que explica cómo compilarla.
 | `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster) |
 | `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle |
 | `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto) |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
+| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`), canal de streaming (`GET /api/stream`, `stream.go`), logs de un container (`GET /api/logs`, `logs.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
@@ -68,6 +68,12 @@ cambiaron sin código nuevo.
 `tipo`: primero `{"tipo":"foto","foto":{…}}` con la foto completa y después
 `{"tipo":"cambios","cambios":[…]}` con lo que cambió (ver `foto.Cambio`). El canal admite más tipos
 de mensaje; el escritor de SSE (`sse` en `stream.go`) sirve también para otras rutas.
+
+`GET /api/logs?namespace=…&pod=…&container=…[&anterior=true]` usa el mismo escritor: manda las
+últimas 1000 líneas del container (`{"tipo":"lineas","lineas":[…]}`) y sigue en vivo; los del
+reinicio anterior (`anterior=true`, `kubectl logs --previous`) terminan con `{"tipo":"fin"}`. Si
+Kubernetes no da los logs llega `{"tipo":"error","error":"…"}`. Cerrar la conexión corta el pedido
+al cluster. Un pod o container que no está en la foto, o `anterior` sin reinicios, dan 404.
 
 ## Contexto y reconexión
 
