@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/conexion"
 )
 
 // contextos es la respuesta de GET /api/contextos.

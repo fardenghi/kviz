@@ -38,7 +38,7 @@ const sinCompilar = `<!doctype html>
 <html lang="es"><meta charset="utf-8"><title>kviz</title>
 <body style="font-family: system-ui, sans-serif; padding: 2rem; color: #1d2430">
 <h1>kviz</h1>
-<p>Este binario se compiló sin la interfaz. Desde el directorio <code>kviz/</code> corré
+<p>Este binario se compiló sin la interfaz. Desde la raíz del código de kviz corré
 <code>make run</code>, que compila la interfaz y después el binario.</p>
 <p>La API sí está disponible, por ejemplo en <a href="/api/foto">/api/foto</a>.</p>
 </body></html>

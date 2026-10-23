@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"kviz/internal/comandos"
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/comandos"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // De calcula las advertencias de la foto f, construida a partir de los objetos o. Es pura y

@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // Tipos de mensaje del stream de la foto (GET /api/stream).

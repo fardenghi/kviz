@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"testing"
 
-	"kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/sondeo"
 )
 
 // pedidoRepetido es el pedido del formulario con la cantidad de repeticiones.

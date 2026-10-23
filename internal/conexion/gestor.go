@@ -11,8 +11,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"kviz/internal/foto"
-	"kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/sondeo"
 )
 
 // Kubeconfig es de dónde salen los contextos y sus clientes. En producción es el kubeconfig de

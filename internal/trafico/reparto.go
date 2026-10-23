@@ -3,7 +3,7 @@ package trafico
 import (
 	"sort"
 
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // Reparto es cómo se repartieron entre los pods las respuestas de una request de prueba repetida

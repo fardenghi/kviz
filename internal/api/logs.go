@@ -22,8 +22,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"kviz/internal/conexion"
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // Tipos de mensaje del stream de logs.

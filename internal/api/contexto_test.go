@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 
-	"kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/conexion"
 )
 
 type contextosJSON struct {

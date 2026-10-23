@@ -21,10 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"kviz/internal/conexion"
-	"kviz/internal/foto"
-	"kviz/internal/sondeo"
-	"kviz/internal/trafico"
+	"github.com/fardenghi/kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/trafico"
 )
 
 // pedidoDePrueba es el cuerpo de POST /api/pruebas.

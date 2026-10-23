@@ -26,8 +26,8 @@ import (
 	listersnetworkingv1 "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 
-	"kviz/internal/advertencias"
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/advertencias"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // Conexion es la conexión a un cluster que responde, con sus informers. La arma el Gestor.

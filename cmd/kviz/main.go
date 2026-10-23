@@ -1,5 +1,5 @@
 // kviz: herramienta local para ver el cluster de Kubernetes del contexto actual de kubectl.
-// Escucha solo en 127.0.0.1 y abre el navegador en su URL. Ver kviz/README.md.
+// Escucha solo en 127.0.0.1 y abre el navegador en su URL. Ver README.md.
 package main
 
 import (
@@ -17,18 +17,26 @@ import (
 	"syscall"
 	"time"
 
-	"kviz/internal/api"
-	"kviz/internal/conexion"
-	"kviz/internal/sondeo"
-	"kviz/web"
+	"github.com/fardenghi/kviz/internal/api"
+	"github.com/fardenghi/kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/web"
 )
 
 const puertoPorDefecto = 7777
 
+// version la inyecta el release con -ldflags "-X main.version=..."; compilado a mano es "dev".
+var version = "dev"
+
 func main() {
 	puerto := flag.Int("puerto", puertoPorDefecto, "puerto en 127.0.0.1; si está ocupado se usa otro libre")
 	noAbrir := flag.Bool("no-abrir", false, "no abrir el navegador al arrancar")
+	verVersion := flag.Bool("version", false, "imprimir la versión y salir")
 	flag.Parse()
+	if *verVersion {
+		fmt.Printf("kviz %s\n", version)
+		return
+	}
 	log.SetFlags(0)
 	log.SetPrefix("kviz: ")
 
@@ -45,7 +53,7 @@ func main() {
 	}
 
 	if !web.Compilada() {
-		log.Print("aviso: este binario no trae la interfaz; compilalo con `make build` desde kviz/")
+		log.Print("aviso: este binario no trae la interfaz; compilalo con `make build` desde la raíz del código de kviz")
 	}
 
 	ln, err := escuchar(*puerto)

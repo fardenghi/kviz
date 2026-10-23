@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
 
-	"kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/sondeo"
 )
 
 const podDelIC = "ingress-nginx-controller-6b9f-lx2wp" // en lab-worker2, 10.244.2.2

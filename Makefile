@@ -1,4 +1,4 @@
-# kviz: compilar, correr y probar. Correr desde este directorio (o con make -C kviz ...).
+# kviz: compilar, correr y probar. Correr desde la raíz del repo.
 
 .PHONY: run build ui test test-go test-web
 

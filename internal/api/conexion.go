@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"time"
 
-	"kviz/internal/sondeo"
-	"kviz/internal/trafico"
+	"github.com/fardenghi/kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/trafico"
 )
 
 // conexionTCP es el resultado de una prueba de conexión, en el campo `conexion` de la prueba.

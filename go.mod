@@ -1,4 +1,4 @@
-module kviz
+module github.com/fardenghi/kviz
 
 go 1.26.0
 

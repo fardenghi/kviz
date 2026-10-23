@@ -1,140 +1,120 @@
 # kviz
 
-Herramienta local para ver el cluster de Kubernetes del contexto actual de kubectl en una vista de
-topología. Spec: `.scratch/kviz/spec.md`; vocabulario: `GLOSSARY.md`; decisión de arquitectura:
-`docs/adr/0001-app-local-con-pod-de-sondeo.md`.
+kviz is a local tool that draws the Kubernetes cluster of your current kubectl context as a live
+topology view, and lets you debug how traffic travels inside it.
 
-## Compilar y correr
+- **Topology view.** Nodes as regions with their pods and containers inside; Services and Ingresses
+  above them, connected to the pods they route to; NodePorts and the Ingress Controller's hostPort as
+  doors on the edge of each node. Each pod is marked with the workload it belongs to.
+- **Live.** The view follows the cluster as it changes: rollouts, restarts, endpoints that come and
+  go, and a strip with the latest cluster events.
+- **Detail panel.** Click any object to see what `kubectl describe` would tell you: probe status,
+  requests and limits with real usage (if metrics-server is installed), environment variables and
+  where they come from, volumes, ConfigMaps, Secrets (hidden until you reveal them), events and live
+  container logs, plus ready-to-copy `kubectl` commands for that object.
+- **Configuration warnings.** Typical mistakes that keep traffic from arriving (a selector that
+  matches no pods, a `targetPort` no container exposes, a probe on the wrong port, an Ingress pointing
+  to a missing Service, …) are flagged on the object with an explanation.
+- **Test requests.** Send an HTTP request (or a plain TCP connection test) from inside the cluster to
+  a Service, a pod IP, a NodePort or an Ingress route, and see the response and the path it took
+  drawn on the diagram: DNS → door → Ingress rule → Service → endpoints → pod. Repeat it N times to
+  see how the load is spread across pods.
+
+kviz runs on your machine and only talks to the Kubernetes API; nothing is installed in the cluster
+except a short-lived probe pod (see [Cluster permissions](#cluster-permissions)).
+
+> **The user interface is in Spanish**, with Kubernetes names (Pod, Service, NodePort, readiness)
+> kept in English as `kubectl` shows them. The command-line flags are in Spanish too.
+
+## Install
+
+**Homebrew** (macOS and Linux):
 
 ```sh
-make -C kviz run
+brew install fardenghi/tap/kviz
 ```
 
-Compila la interfaz (React + TypeScript, con Vite) y el binario de Go que la incluye (`kviz/bin/kviz`),
-y lo arranca: escucha solo en `127.0.0.1:7777` (si está ocupado usa otro puerto libre y lo imprime)
-y abre el navegador. Opciones: `-puerto N`, `-no-abrir`. Sin contexto de kubectl, o con el cluster
-caído, kviz arranca igual y muestra "desconectado".
-
-Requisitos: Go 1.26+, Node 22+.
-
-## Tests
+**krew** (as a kubectl plugin):
 
 ```sh
-make -C kviz test     # go test ./... + vitest
+kubectl krew install kviz
+kubectl kviz
 ```
 
-- **Costura 1** (`internal/api/*_test.go`): tests de la API HTTP contra el cliente falso de client-go
-  (`fake.NewClientset`) y `httptest`. El arnés está en `internal/api/kviz_test.go`.
-- **Costura 2** (`web/src/escena/*.test.ts`): tests con Vitest de la función pura de escena.
-
-## Desarrollo de la interfaz
+**Prebuilt binaries:** download the archive for your OS and architecture (macOS, Linux and Windows;
+amd64 and arm64) from the [Releases page](https://github.com/fardenghi/kviz/releases), check it
+against `checksums.txt`, and put `kviz` somewhere in your `PATH`. On macOS, if Gatekeeper refuses to
+open a downloaded binary, remove the quarantine attribute:
 
 ```sh
-cd kviz && go run ./cmd/kviz -no-abrir   # backend en :7777
-npm --prefix kviz/web run dev            # interfaz con recarga en caliente; /api va al backend
+xattr -d com.apple.quarantine ./kviz
 ```
 
-`go build ./...` funciona sin compilar la interfaz (`web/dist/.gitkeep` está commiteado); ese binario
-sirve una página que explica cómo compilarla.
+**From source** (requires Go 1.26+ and Node 22+):
 
-## Mapa
+```sh
+git clone https://github.com/fardenghi/kviz.git
+cd kviz
+make build      # builds the UI and the Go binary that embeds it: bin/kviz
+```
 
-| Dónde | Qué (módulo de la spec) |
+## Usage
+
+```sh
+kviz
+```
+
+kviz connects to the current kubectl context, starts a web server on `127.0.0.1:7777` and opens your
+browser on it. If port 7777 is taken it picks a free port and prints it. Press `Ctrl+C` to stop it.
+
+| Flag | Meaning |
 |---|---|
-| `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
-| `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster), `metricas.go` (4 · métricas: metrics-server detrás de la interfaz `Metricas`, consultado cada intervalo) |
-| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle; `env.go`: origen de env; `configmaps.go`: ConfigMaps y Secrets (solo claves); `volumenes.go`: volúmenes y montajes; `probes.go`: 3 · estado de probe; `recursos.go`: requests, limits y consumo |
-| `internal/advertencias/` | 6 · advertencias de configuración: las seis reglas de las historias 70–75, puras sobre la foto (y los objetos de los que sale), con explicación y comando sugerido; viajan en `foto.advertencias` |
-| `internal/sondeo/` | 10 · pod de sondeo: ciclo de vida en `kviz-system` (`sondeo.go`: se crea con la primera request, huérfanos al conectarse, se borra al cerrar o al cambiar de contexto) y `Ejecutor`, la interfaz "ejecutar y devolver el resultado crudo" (`exec.go`: curl por exec; `conexion.go`: prueba de conexión TCP con curl telnet://; en los tests, `sondeoDePrueba`) |
-| `internal/trafico/` | 11 · depuración de tráfico, puro: URL del destino, recorrido desde la foto (`Recorrer` en `recorrer.go`: DNS, puerta, Service, endpoints; `ingress.go`: regla de Ingress y rewrite como ingress-nginx), pod que respondió y salto entre nodos (`respuesta.go`: `PodQueRespondio` por el body o el log del Ingress Controller, `ConRespuesta`) y reparto |
-| `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto); `tipo=metrics-server` da cómo instalarlo en kind |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/secreto` en `secreto.go`, `POST /api/pruebas` en `pruebas.go`, historial `GET /api/pruebas[/{id}]` en `historial.go`), canal de streaming (`GET /api/stream`, `stream.go`), logs de un container (`GET /api/logs`, `logs.go`) y costura 1 |
-| `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
-| `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
-| `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
-| `web/src/escena/` | escena de la vista de topología: función pura (costura 2) |
-| `web/src/escena/recorrido.ts` | recorrido de una request de prueba: pasos numerados por objeto (y región), atenuado, tono `recorrido`, arco de salto entre nodos, paso elegido, pods del Ingress Controller visibles; apaga el foco |
-| `web/src/prueba.ts` | espejo TypeScript de la request de prueba y su recorrido (`POST /api/pruebas`) |
-| `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
-| `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
-| `web/src/superficies/` | superficies flotantes (lista de workloads, franja de events, formulario de request de prueba, tarjeta del recorrido, …) |
-| `web/src/events.ts` | events del cluster (`internal/foto/events.go`): los de la franja (con los filtros de namespace), el objeto que selecciona un clic y los events de un objeto para el panel |
-| `web/src/detalle/` | panel de detalle (cajón a la derecha): `detalle.ts` qué objeto muestra; una sección por archivo en `secciones/` (ver `secciones.ts`); `Comando.tsx` comando sugerido con botón de copiar |
-| `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
+| `-puerto N` | port to listen on, on `127.0.0.1` (default `7777`); if it is taken, a free one is used |
+| `-no-abrir` | don't open the browser on start |
+| `-version` | print the version and exit |
 
-Para agregar un objeto a la foto: su informer en `internal/conexion` (con el handler de avisos, para
-que sus cambios lleguen en vivo), el campo en `foto.Objetos`, `foto.Foto` y `foto.Construir`, el espejo
-en `web/src/foto.ts`, y lo que dibuja en `web/src/escena`. Cada objeto de una lista de la foto lleva
-un `id` único en su lista y la lista va ordenada por id: así el stream manda solo los objetos que
-cambiaron sin código nuevo.
+As a kubectl plugin the flags are passed through unchanged: `kubectl kviz -puerto 8000`.
 
-## Tiempo real
+You can switch to any other context of your kubeconfig from the top bar without restarting. kviz
+never modifies your kubeconfig. If the cluster goes away (for example after `kind delete cluster`)
+kviz shows "desconectado" and reconnects by itself when it comes back.
 
-`GET /api/stream` es un stream de Server-Sent Events. Cada mensaje es `data: <JSON>` con un campo
-`tipo`: primero `{"tipo":"foto","foto":{…}}` con la foto completa y después
-`{"tipo":"cambios","cambios":[…]}` con lo que cambió (ver `foto.Cambio`). El canal admite más tipos
-de mensaje; el escritor de SSE (`sse` en `stream.go`) sirve también para otras rutas.
+## Requirements
 
-`GET /api/logs?namespace=…&pod=…&container=…[&anterior=true]` usa el mismo escritor: manda las
-últimas 1000 líneas del container (`{"tipo":"lineas","lineas":[…]}`) y sigue en vivo; los del
-reinicio anterior (`anterior=true`, `kubectl logs --previous`) terminan con `{"tipo":"fin"}`. Si
-Kubernetes no da los logs llega `{"tipo":"error","error":"…"}`. Cerrar la conexión corta el pedido
-al cluster. Un pod o container que no está en la foto, o `anterior` sin reinicios, dan 404.
+- A kubeconfig with a context, as `kubectl` uses it (`KUBECONFIG` or `~/.kube/config`). Without a
+  context, or with the cluster down, kviz still starts and shows that it is disconnected.
+- Optional: [metrics-server](https://github.com/kubernetes-sigs/metrics-server) in the cluster to see
+  real CPU and memory usage. Without it kviz shows "sin métricas" and suggests how to install it.
 
-## Secrets
+## Cluster permissions
 
-La foto y el stream traen los Secrets solo con sus claves, y una variable de entorno que sale de un
-Secret viaja sin valor. El único camino por el que un valor sale de kviz es `POST /api/secreto` con
-`{"namespace", "nombre", "clave"}` → `{"valor"}` (404 si no existe), que el panel de detalle usa al
-tocar "Revelar".
+kviz uses the credentials of your kubectl context. It is **read-only**, with one exception: the probe
+pod used to send test requests.
 
-## Contexto y reconexión
+- **Reads** (get, list, watch), cluster-wide: nodes, pods, pod logs, Services,
+  EndpointSlices, Ingresses, IngressClasses, Deployments, ReplicaSets, StatefulSets, DaemonSets,
+  Jobs, CronJobs, ConfigMaps, Secrets and events; and pod metrics from `metrics.k8s.io` if available.
+  Secrets travel to the UI with their keys only; a value leaves kviz only when you click "Revelar"
+  on it.
+- **Writes**, only the first time you send a test request: kviz creates the `kviz-system` namespace
+  if it doesn't exist (it only reads that one namespace), creates one pod there (`curlimages/curl`), and runs `curl` in it with
+  `pods/exec`. The pod is deleted when kviz exits or switches context. If kviz was killed abruptly,
+  it reuses or deletes the leftover pod the next time it starts.
 
-kviz arranca en el contexto actual de kubectl y nunca modifica el kubeconfig. `GET /api/contextos`
-devuelve `{"actual", "contextos"}` (se relee el kubeconfig en cada pedido) y `POST /api/contexto`
-con `{"contexto": "<nombre>"}` cambia en caliente (204; 404 si el contexto no existe). El `Gestor`
-revisa cada 2 s que el cluster responda: si deja de responder (o su contexto se va del kubeconfig,
-como con `kind delete cluster`) apaga los informers y la foto queda desconectada con el motivo;
-reintenta con un cliente nuevo del kubeconfig hasta que el cluster vuelve. Sin contexto, espera a
-que kubectl tenga uno. El stream manda la foto completa (`tipo: "foto"`) cada vez que cambia el
-contexto o el estado de conexión. En los tests, `kubeconfigDePrueba` (`internal/api/contexto_test.go`)
-tiene varios clusters falsos que se pueden crear, borrar o hacer caer.
+Think about this before pointing kviz at a cluster that is not a test cluster.
 
-## Request de prueba y pod de sondeo
+## Security
 
-`POST /api/pruebas` con `{"destino", "metodo", "path", "headers": [{"nombre","valor"}], "body"}`
-manda la request desde el pod de sondeo y responde `{"id", "url", "origen", "respuesta": {"status",
-"texto", "headers", "body", "ms"} | null, "error", "recorrido": {"pasos": [{"n", "tipo", "titulo",
-"detalle", "objetos": [{"tipo", "id"}]}]}}`. Los `objetos` de cada paso son refs a la foto (tipo e
-`id` de su lista); la escena los convierte a ids de escena (`escena/recorrido.ts`, `idEnEscena`), así
-un paso nuevo (DNS, puerta, Ingress, salto) se dibuja sin tocar la escena. El pod de sondeo
-(`curlimages/curl`, en `kviz-system`, con las etiquetas `sondeo.Etiquetas`) es la única escritura de
-kviz en el cluster, además de crear `kviz-system` si no existe.
+kviz listens **only on `127.0.0.1`**, never on other interfaces, so nobody else on your network can
+see your Secrets or send requests into your cluster through it. The history of test requests lives
+only in memory and is lost when kviz exits.
 
-El destino puede ser un Service (nombre DNS o ClusterIP), la IP de un pod, o un nodo (nombre o
-InternalIP) con el puerto de una puerta: un NodePort, o el hostPort del Ingress Controller (una ruta
-de Ingress: `lab-worker2:80` con path `/backend/hello`). El recorrido es DNS (si el destino es un
-nombre) → puerta → regla de Ingress con el path reescrito → Service → endpoints, y suma el salto
-entre nodos y el pod solo cuando se sabe qué pod respondió: porque el body trae su nombre, o porque
-el log del Ingress Controller lo dice. Para eso, a una request que pasa por el Ingress Controller
-kviz le agrega `X-Request-ID: kviz-…` (si el pedido no trae uno), que ingress-nginx escribe al final
-de cada línea de su log (`$req_id`), y después lee las últimas líneas del log del controller
-(`GET /api/logs` usa el mismo `Cluster.Logs`, acá sin seguir) para tomar `$upstream_addr`. Una prueba
-de conexión TCP no pasa por las reglas de Ingress: termina en el pod del Ingress Controller.
+## Documentation
 
-La prueba de conexión TCP es el mismo `POST /api/pruebas` con `{"tipo": "tcp", "destino":
-"host:puerto"}` (`internal/api/conexion.go`): el pod de sondeo abre una conexión con `curl
-telnet://` sin hablar ningún protocolo (`internal/sondeo/conexion.go`, que corta el exec apenas curl
-avisa que conectó) y la respuesta trae `"conexion": {"resultado": "abre" | "rechaza" | "timeout",
-"ms", "motivo"}` en lugar de `respuesta` (null, con `error`, si ni se pudo intentar), el mismo
-recorrido (`trafico.URLTCP` → `Recorrer`) y queda en el historial. No se repite (400 con
-`repeticiones` > 1).
+- [docs/GLOSSARY.md](docs/GLOSSARY.md): the vocabulary kviz uses (in Spanish).
+- [docs/adr/](docs/adr/): architecture decisions, such as why kviz runs locally with a probe pod.
+- [CONTRIBUTING.md](CONTRIBUTING.md): building, testing and finding your way around the code.
 
-Con `"repeticiones": N` (1–20) la misma request se manda N veces, una detrás de otra; `respuesta`,
-`error` y el pod del recorrido son los de la primera, y `reparto` (null con una sola) cuenta las
-respuestas por pod con la misma identificación que el recorrido (`trafico.Repartir` sobre
-`PodQueRespondio`): `{"total", "pods": [{"pod", "n"}], "sinIdentificar", "sinRespuesta"}`. La
-escena lo dibuja como pastilla `n/N` sobre cada pod (`escena/reparto.ts`) y la tarjeta del
-recorrido como barras. Cada prueba (con su `contexto`) queda en el historial de la sesión:
-`GET /api/pruebas` las da todas, de la más vieja a la más nueva, y `GET /api/pruebas/{id}` una (404
-si no está). Vive solo en memoria (las últimas 100) y se pierde al cerrar kviz.
+## License
+
+[MIT](LICENSE) © 2026 Filipo Ardenghi

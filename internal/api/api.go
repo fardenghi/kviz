@@ -23,10 +23,10 @@ import (
 	"io"
 	"net/http"
 
-	"kviz/internal/comandos"
-	"kviz/internal/conexion"
-	"kviz/internal/foto"
-	"kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/comandos"
+	"github.com/fardenghi/kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/sondeo"
 )
 
 // Cluster es lo que la API necesita del cluster conectado.

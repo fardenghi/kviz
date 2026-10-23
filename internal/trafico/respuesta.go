@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // HeaderDeRequest es el header con el que kviz encuentra la request en el log de ingress-nginx:

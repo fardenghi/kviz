@@ -8,7 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // Opcion ajusta el cálculo del recorrido con lo que trae el pedido además de la URL.

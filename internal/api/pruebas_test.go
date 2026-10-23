@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stesting "k8s.io/client-go/testing"
 
-	"kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/sondeo"
 )
 
 // Contrato JSON de POST /api/pruebas, tal como lo lee la interfaz (web/src/prueba.ts).

@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // desdeIngressController sigue una request que llega a los pods del Ingress Controller: la regla

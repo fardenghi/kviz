@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"kviz/internal/sondeo"
+	"github.com/fardenghi/kviz/internal/sondeo"
 )
 
 // conexionJSON es el resultado de una prueba de conexión, tal como lo lee la interfaz.

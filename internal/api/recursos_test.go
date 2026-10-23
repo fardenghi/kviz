@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
-	"kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/conexion"
 )
 
 type cantidadEnFoto struct {

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // Comando es un comando sugerido.

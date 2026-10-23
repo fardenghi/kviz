@@ -16,7 +16,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"kviz/internal/foto"
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 // Recorrido es el camino que siguió una request de prueba, en pasos numerados.

@@ -20,8 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"kviz/internal/api"
-	"kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/api"
+	"github.com/fardenghi/kviz/internal/conexion"
 )
 
 // Contrato JSON de la foto, tal como lo lee la interfaz (web/src/foto.ts).

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"kviz/internal/conexion"
+	"github.com/fardenghi/kviz/internal/conexion"
 )
 
 // pedidoDeSecret es el cuerpo de POST /api/secreto.
