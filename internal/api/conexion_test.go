@@ -8,6 +8,7 @@ package api_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -127,6 +128,37 @@ func TestUnTipoDePruebaDesconocidoEsUnError(t *testing.T) {
 
 	if status, _ := kviz.mandarConexion(t, pedidoDePrueba{Tipo: "udp", Destino: "backend.default:80"}); status != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400", status)
+	}
+}
+
+func TestLaPruebaDeConexionQuedaEnElHistorialDeLaSesion(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab", append(clusterDeLaGuia(), postgresConService()...)...)
+	kviz.sondeo.conectar(sondeo.ResultadoTCP{Resultado: sondeo.Rechaza, Duracion: time.Millisecond, Motivo: "Connection refused"})
+
+	_, got := kviz.mandarConexion(t, pedidoDePrueba{Tipo: "tcp", Destino: "postgres.default:5432"})
+
+	var historial []pruebaDeConexionJSON
+	kviz.getJSON(t, "/api/pruebas", &historial)
+	if len(historial) != 1 || !reflect.DeepEqual(historial[0], got) || historial[0].Conexion == nil || historial[0].Conexion.Resultado != "rechaza" {
+		t.Fatalf("historial = %s, want la prueba de conexión tal como se respondió (%s)", mostrar(historial), mostrar(got))
+	}
+	var contexto struct {
+		Contexto     string `json:"contexto"`
+		Repeticiones int    `json:"repeticiones"`
+	}
+	kviz.getJSON(t, fmt.Sprintf("/api/pruebas/%d", got.ID), &contexto)
+	if contexto.Contexto != "kind-lab" || contexto.Repeticiones != 1 {
+		t.Fatalf("prueba en el historial = %s, want del contexto kind-lab y mandada una vez", mostrar(contexto))
+	}
+}
+
+func TestUnaPruebaDeConexionNoSeRepite(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuia()...)
+
+	status, _ := kviz.repetirPrueba(t, pedidoRepetido{pedidoDePrueba: pedidoDePrueba{Tipo: "tcp", Destino: "backend.default:80"}, Repeticiones: 3})
+
+	if status != http.StatusBadRequest || len(kviz.sondeo.conexionesEjecutadas()) != 0 {
+		t.Fatalf("status %d, %d conexiones, want 400 sin conectar: el reparto es de requests HTTP", status, len(kviz.sondeo.conexionesEjecutadas()))
 	}
 }
 

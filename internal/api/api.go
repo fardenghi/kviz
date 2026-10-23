@@ -8,6 +8,7 @@
 //	GET /api/contextos   el contexto de kviz y los contextos del kubeconfig (ver contexto.go)
 //	POST /api/contexto   cambia de contexto en caliente
 //	POST /api/pruebas   request de prueba desde el pod de sondeo, con su respuesta y recorrido (ver pruebas.go)
+//	GET /api/pruebas    historial de las pruebas de la sesión, solo en memoria; /api/pruebas/{id} una (ver historial.go)
 //	GET /api/logs?namespace=default&pod=nginx&container=web[&anterior=true]
 //	                logs de un container por Server-Sent Events: en vivo o del reinicio anterior (ver logs.go)
 //	GET /api/comandos?tipo=Pod&namespace=default&nombre=nginx
@@ -21,7 +22,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"sync/atomic"
 
 	"kviz/internal/comandos"
 	"kviz/internal/conexion"
@@ -57,7 +57,10 @@ func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/stream", transmitirFoto(cluster))
 	mux.HandleFunc("GET /api/contextos", listarContextos(cluster))
 	mux.HandleFunc("POST /api/contexto", cambiarContexto(cluster))
-	mux.HandleFunc("POST /api/pruebas", mandarPrueba(cluster, new(atomic.Int64)))
+	pruebas := &historial{}
+	mux.HandleFunc("POST /api/pruebas", mandarPrueba(cluster, pruebas))
+	mux.HandleFunc("GET /api/pruebas", pruebas.listar)
+	mux.HandleFunc("GET /api/pruebas/{id}", pruebas.buscar)
 	mux.HandleFunc("POST /api/secreto", revelarSecret(cluster))
 	mux.HandleFunc("GET /api/logs", transmitirLogs(cluster))
 	mux.HandleFunc("GET /api/comandos", func(w http.ResponseWriter, r *http.Request) {

@@ -3,14 +3,14 @@ package api
 // Prueba de conexión TCP: POST /api/pruebas con `tipo: "tcp"`. Para destinos que no hablan HTTP
 // (Postgres en 5432, por ejemplo): kviz abre una conexión TCP desde el pod de sondeo, sin hablar
 // ningún protocolo, y dice si el puerto abre, rechaza o da timeout. El recorrido es el mismo que el
-// de una request de prueba al mismo host y puerto.
+// de una request de prueba al mismo host y puerto, y queda en el historial igual. No se repite: el
+// reparto es de requests HTTP (el pod que respondió sale del body).
 
 import (
 	"context"
 	"errors"
 	"net/http"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"kviz/internal/sondeo"
@@ -30,10 +30,14 @@ type conexionTCP struct {
 // esperaConexion es el tiempo máximo de una prueba de conexión, contando crear el pod de sondeo.
 const esperaConexion = sondeo.EsperaArranque + sondeo.EsperaConexion + 10*time.Second
 
-func mandarConexion(w http.ResponseWriter, r *http.Request, cluster Cluster, ids *atomic.Int64, p pedidoDePrueba) {
+func mandarConexion(w http.ResponseWriter, r *http.Request, cluster Cluster, h *historial, p pedidoDePrueba) {
 	u, err := trafico.URLTCP(p.Destino)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if p.Repeticiones > 1 {
+		http.Error(w, "la prueba de conexión no se repite: el reparto es de requests HTTP", http.StatusBadRequest)
 		return
 	}
 	puerto, _ := strconv.ParseInt(u.Port(), 10, 32)
@@ -52,12 +56,15 @@ func mandarConexion(w http.ResponseWriter, r *http.Request, cluster Cluster, ids
 		return
 	}
 
+	f := cluster.Foto()
 	out := prueba{
-		ID:        int(ids.Add(1)),
-		Tipo:      p.Tipo,
-		URL:       u.String(),
-		Origen:    origen(pod),
-		Recorrido: trafico.Recorrer(cluster.Foto(), u),
+		ID:           h.nuevoID(),
+		Tipo:         p.Tipo,
+		URL:          u.String(),
+		Origen:       origen(pod),
+		Recorrido:    trafico.Recorrer(f, u),
+		Contexto:     f.Contexto,
+		Repeticiones: 1,
 	}
 	if err != nil {
 		out.Error = sinRespuesta.Motivo
@@ -68,5 +75,6 @@ func mandarConexion(w http.ResponseWriter, r *http.Request, cluster Cluster, ids
 			Motivo:    res.Motivo,
 		}
 	}
+	h.guardar(out)
 	responderJSON(w, out)
 }

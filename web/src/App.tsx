@@ -89,7 +89,11 @@ export function App() {
   );
   // si el workload seleccionado se borra o queda oculto por los filtros, se deselecciona
   const workloadSeleccionado = workload !== null && workloads.some((w) => w.id === workload) ? workload : null;
-  const recorrido = verRecorrido && prueba ? prueba.recorrido : null;
+  // una prueba del historial mandada en otro contexto muestra su respuesta, pero no su recorrido:
+  // sus objetos son de otro cluster
+  const pruebaVista = verRecorrido && prueba && prueba.contexto === foto?.contexto ? prueba : null;
+  const recorrido = pruebaVista?.recorrido ?? null;
+  const reparto = pruebaVista?.reparto ?? null;
   const escena = useMemo(
     () =>
       foto?.conectado
@@ -101,10 +105,11 @@ export function App() {
             hover,
             seleccionado,
             recorrido,
+            reparto,
             podsNuevos: podsNuevos(enVivo, Date.now()),
           })
         : null,
-    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado, recorrido], // eslint-disable-line react-hooks/exhaustive-deps
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado, recorrido, reparto], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // el panel muestra el objeto mientras siga en la foto; si se borra, se cierra solo

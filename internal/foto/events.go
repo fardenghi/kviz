@@ -158,20 +158,24 @@ func veces(e corev1.Event) int32 {
 // ultimaVez es la última vez que pasó el event. Los events viejos (core/v1) la llevan en
 // lastTimestamp; los nuevos (events.k8s.io) en series o en eventTime.
 func ultimaVez(e corev1.Event) string {
-	var t time.Time
-	switch {
-	case e.Series != nil && !e.Series.LastObservedTime.IsZero():
-		t = e.Series.LastObservedTime.Time
-	case !e.LastTimestamp.IsZero():
-		t = e.LastTimestamp.Time
-	case !e.EventTime.IsZero():
-		t = e.EventTime.Time
-	case !e.FirstTimestamp.IsZero():
-		t = e.FirstTimestamp.Time
-	case !e.CreationTimestamp.IsZero():
-		t = e.CreationTimestamp.Time
-	default:
+	t := cuandoFue(e)
+	if t.IsZero() {
 		return ""
 	}
 	return t.UTC().Format(time.RFC3339)
+}
+
+// cuandoFue es la última vez que pasó el event (ver ultimaVez); cero si no se sabe.
+func cuandoFue(e corev1.Event) time.Time {
+	switch {
+	case e.Series != nil && !e.Series.LastObservedTime.IsZero():
+		return e.Series.LastObservedTime.Time
+	case !e.LastTimestamp.IsZero():
+		return e.LastTimestamp.Time
+	case !e.EventTime.IsZero():
+		return e.EventTime.Time
+	case !e.FirstTimestamp.IsZero():
+		return e.FirstTimestamp.Time
+	}
+	return e.CreationTimestamp.Time
 }

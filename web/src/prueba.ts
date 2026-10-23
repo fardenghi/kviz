@@ -24,7 +24,12 @@ export interface PedidoDePrueba {
   path?: string;
   headers?: Header[];
   body?: string;
+  /** Cuántas veces se manda la misma request (1 por defecto, hasta MAX_REPETICIONES). */
+  repeticiones?: number;
 }
+
+/** Tope de repeticiones de una request de prueba (maxRepeticiones en internal/api/pruebas.go). */
+export const MAX_REPETICIONES = 20;
 
 /** Una request de prueba (o prueba de conexión) ya ejecutada desde el pod de sondeo. */
 export interface Prueba {
@@ -43,6 +48,24 @@ export interface Prueba {
   conexion?: ConexionTCP;
   error?: string;
   recorrido: Recorrido;
+  /** Contexto de kubectl en el que se mandó (el historial dura toda la sesión). */
+  contexto: string;
+  /** Cuántas veces se mandó; respuesta, error y el pod del recorrido son los de la primera. */
+  repeticiones: number;
+  /** Respuestas por pod; null si se mandó una sola vez. */
+  reparto: Reparto | null;
+}
+
+/** Cómo se repartieron entre los pods las respuestas de una request repetida N veces. */
+export interface Reparto {
+  /** Requests mandadas. */
+  total: number;
+  /** Respuestas de cada pod identificado (id de la foto, `<ns>/<nombre>`), de más a menos. */
+  pods: { pod: string; n: number }[];
+  /** Respuestas de las que no se sabe qué pod las dio. */
+  sinIdentificar: number;
+  /** Requests que no recibieron respuesta. */
+  sinRespuesta: number;
 }
 
 /** Resultado de una prueba de conexión TCP. */

@@ -24,6 +24,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+
+	"kviz/internal/conexion"
 )
 
 type contextosJSON struct {
@@ -250,6 +252,8 @@ type kubeconfigDePrueba struct {
 type clusterDePrueba struct {
 	cliente *fake.Clientset
 	caido   atomic.Bool
+	// metricsServer es nil si el cluster no tiene metrics-server (ver recursos_test.go).
+	metricsServer *metricsServerDePrueba
 }
 
 func nuevoKubeconfig(actual string) *kubeconfigDePrueba {
@@ -312,4 +316,17 @@ func (kc *kubeconfigDePrueba) Cliente(contexto string) (kubernetes.Interface, er
 		return nil, fmt.Errorf("context %q does not exist", contexto)
 	}
 	return c.cliente, nil
+}
+
+func (kc *kubeconfigDePrueba) Metricas(contexto string) (conexion.Metricas, error) {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+	c, ok := kc.clusters[contexto]
+	if !ok {
+		return nil, fmt.Errorf("context %q does not exist", contexto)
+	}
+	if c.metricsServer == nil {
+		return &metricsServerDePrueba{}, nil // sin instalar
+	}
+	return c.metricsServer, nil
 }

@@ -1,10 +1,12 @@
 // Formulario de request de prueba (superficie flotante, arriba a la izquierda, al lado de la lista
 // de workloads): destino, método, path, headers y body, como un Postman chico. La request sale del
-// pod de sondeo de kviz; abajo se ven status, headers, body y tiempo. Con "TCP" es una prueba de
-// conexión: solo el destino `host:puerto`, y abajo si abre, rechaza o da timeout.
-import { type FormEvent, useState } from 'react';
-import { mandarPrueba } from '../api';
-import { leerHeaders, lineaDelPedido, type Prueba, type TipoDePrueba } from '../prueba';
+// pod de sondeo de kviz; abajo se ven status, headers, body y tiempo. Se puede repetir N veces para
+// ver el reparto entre pods, y el historial de la sesión (en la memoria de kviz) vuelve a mostrar
+// la respuesta y el recorrido de cualquier prueba anterior. Con "TCP" es una prueba de conexión:
+// solo el destino `host:puerto`, y abajo si abre, rechaza o da timeout.
+import { type FormEvent, useEffect, useState } from 'react';
+import { mandarPrueba, pedirHistorial } from '../api';
+import { leerHeaders, lineaDelPedido, MAX_REPETICIONES, type Prueba, type TipoDePrueba } from '../prueba';
 
 const METODOS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
@@ -28,6 +30,15 @@ export function FormularioDePrueba({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prueba, setPrueba] = useState<Prueba | null>(null);
+  const [repeticiones, setRepeticiones] = useState(1);
+  const [historial, setHistorial] = useState<Prueba[]>([]);
+  const refrescarHistorial = () =>
+    pedirHistorial()
+      .then(setHistorial)
+      .catch(() => {}); // queda el historial anterior
+  useEffect(() => {
+    refrescarHistorial();
+  }, []);
 
   const enviar = (e: FormEvent) => {
     e.preventDefault();
@@ -36,14 +47,17 @@ export function FormularioDePrueba({
     const pedido =
       tipo === 'tcp'
         ? { tipo, destino }
-        : { tipo, destino, metodo, path, headers: leerHeaders(headers), body: conBody(metodo) ? body : '' };
+        : { tipo, destino, metodo, path, headers: leerHeaders(headers), body: conBody(metodo) ? body : '', repeticiones };
     mandarPrueba(pedido)
       .then((p) => {
         setPrueba(p);
         alResponder(p);
       })
       .catch((err: Error) => setError(err.message))
-      .finally(() => setEnviando(false));
+      .finally(() => {
+        setEnviando(false);
+        refrescarHistorial();
+      });
   };
 
   return (
@@ -115,11 +129,35 @@ export function FormularioDePrueba({
           <button className="boton boton-primario" type="submit" disabled={enviando || !destino.trim()}>
             Enviar
           </button>
+          {tipo === 'http' && (
+            <label className="repetir" title="Manda la misma request varias veces para ver el reparto entre pods">
+              repetir
+              <input
+                type="number"
+                min={1}
+                max={MAX_REPETICIONES}
+                value={repeticiones}
+                onChange={(e) => setRepeticiones(Math.min(MAX_REPETICIONES, Math.max(1, Math.round(Number(e.target.value)) || 1)))}
+              />
+              veces
+            </label>
+          )}
           {enviando && <span className="tenue-texto">Enviando… (la primera vez kviz crea el pod de sondeo)</span>}
         </div>
       </form>
       {error && <div className="respuesta pastilla-mal">{error}</div>}
       {prueba && !enviando && <Respuesta prueba={prueba} />}
+      {historial.length > 0 && (
+        <Historial
+          pruebas={historial}
+          actual={prueba?.id ?? null}
+          alElegir={(p) => {
+            setError(null);
+            setPrueba(p);
+            alResponder(p);
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -167,6 +205,12 @@ function Respuesta({ prueba: p }: { prueba: Prueba }) {
           <span className="pastilla pastilla-mal">sin respuesta</span> <span>{p.error}</span>
         </div>
       )}
+      {p.reparto && (
+        <div className="tenue-texto chica">
+          Repetida {p.repeticiones} veces: el reparto está en la tarjeta del recorrido
+          {p.reparto.sinRespuesta > 0 && ` (${p.reparto.sinRespuesta} sin respuesta)`}.
+        </div>
+      )}
       <div className="tenue-texto chica">Origen: {p.origen}</div>
     </div>
   );
@@ -189,6 +233,37 @@ export function PastillaDelResultado({ prueba: p }: { prueba: Prueba }) {
     <span className={r.status < 400 ? 'pastilla pastilla-ok' : 'pastilla pastilla-mal'}>
       {r.status} {r.texto} · {formatearMs(r.ms)}
     </span>
+  );
+}
+
+// historial de la sesión, de la más nueva a la más vieja; un clic vuelve a mostrar esa prueba
+function Historial({ pruebas, actual, alElegir }: { pruebas: Prueba[]; actual: number | null; alElegir: (p: Prueba) => void }) {
+  return (
+    <details className="historial-pruebas" open>
+      <summary className="chica">Historial de la sesión ({pruebas.length})</summary>
+      <ol>
+        {[...pruebas].reverse().map((p) => (
+          <li key={p.id}>
+            <button type="button" aria-current={p.id === actual} onClick={() => alElegir(p)} title={`${lineaDelPedido(p)} · ${p.contexto}`}>
+              <span className="tenue-texto">#{p.id}</span>
+              <span className="historial-url">{lineaDelPedido(p)}</span>
+              <span>
+                {p.repeticiones > 1 && <span className="tenue-texto">×{p.repeticiones} </span>}
+                {p.tipo === 'tcp' ? (
+                  <span className={p.conexion?.resultado === 'abre' ? 'pastilla pastilla-ok' : 'pastilla pastilla-mal'}>
+                    {p.conexion?.resultado ?? '✕'}
+                  </span>
+                ) : p.respuesta ? (
+                  <span className={p.respuesta.status < 400 ? 'pastilla pastilla-ok' : 'pastilla pastilla-mal'}>{p.respuesta.status}</span>
+                ) : (
+                  <span className="pastilla pastilla-mal">✕</span>
+                )}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }
 
