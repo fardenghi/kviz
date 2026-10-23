@@ -27,19 +27,8 @@ type Cambio struct {
 // determinista (por sección y por id). Si son iguales no devuelve ninguno.
 func Comparar(antes, despues Foto) []Cambio {
 	a, d := secciones(antes), secciones(despues)
-	nombres := make([]string, 0, len(a)+len(d))
-	for s := range a {
-		nombres = append(nombres, s)
-	}
-	for s := range d {
-		if _, ok := a[s]; !ok {
-			nombres = append(nombres, s)
-		}
-	}
-	sort.Strings(nombres)
-
 	cambios := []Cambio{}
-	for _, s := range nombres {
+	for _, s := range claves(a, d) {
 		va, ok := a[s]
 		vd, sigue := d[s]
 		switch {
@@ -74,7 +63,7 @@ func compararSeccion(s string, antes, despues json.RawMessage) []Cambio {
 		return []Cambio{{Seccion: s, Valor: despues}}
 	}
 	var cambios []Cambio
-	for _, id := range ids(a, d) {
+	for _, id := range claves(a, d) {
 		va, estaba := a[id]
 		vd, esta := d[id]
 		switch {
@@ -107,7 +96,8 @@ func porID(crudo json.RawMessage) (m map[string]json.RawMessage, ok bool) {
 	return m, true
 }
 
-func ids(a, b map[string]json.RawMessage) []string {
+// claves son las claves que están en a o en b, ordenadas.
+func claves(a, b map[string]json.RawMessage) []string {
 	todos := make([]string, 0, len(a)+len(b))
 	for id := range a {
 		todos = append(todos, id)
