@@ -52,3 +52,18 @@ body { background: var(--fondo); }
 .region-titulo { font-size: 14px; font-weight: 700; fill: var(--tinta); }
 .pod { fill: #fff; stroke: #d5dae0; stroke-width: 1.2; }
 .pod-nombre { font-size: 11.5px; font-weight: 600; fill: var(--tinta); }
+
+/* workloads: etiqueta en la tarjeta del pod y lista plegable arriba a la izquierda */
+.pod-workload { font-size: 10px; font-weight: 600; }
+.lista-workloads { left: 12px; top: 12px; width: 220px; max-height: 42%; display: flex; flex-direction: column; overflow: hidden; }
+.lista-workloads-cabecera { font: inherit; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 0; background: none; cursor: pointer; text-align: left; }
+.lista-workloads-cabecera .plegar { margin-left: auto; }
+.lista-workloads-items { list-style: none; margin: 0; padding: 0 4px 6px; overflow-y: auto; }
+.lista-workloads-items .vacio { padding: 4px 8px; font-size: 12px; }
+.workload { font: inherit; font-size: 12px; width: 100%; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 0; border-radius: 6px; background: none; cursor: pointer; text-align: left; }
+.workload:hover { background: #f3f4f6; }
+.workload-elegido { background: #eef1f5; }
+.workload-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workload-tipo { margin-left: auto; font-size: 11px; }
+.muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.cadena { margin: 2px 6px 6px 22px; font-size: 11.5px; display: grid; gap: 2px; }

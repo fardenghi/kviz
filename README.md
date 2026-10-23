@@ -43,12 +43,14 @@ sirve una página que explica cómo compilarla.
 |---|---|
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
 | `internal/conexion/` | 1 · conexión al cluster: contexto de kubectl, informers, conectado/desconectado |
-| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON) |
+| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload |
 | `internal/api/` | 12 · API HTTP (`GET /api/foto`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/escena/` | escena de la vista de topología: función pura (costura 2) |
+| `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
+| `web/src/superficies/` | superficies flotantes (lista de workloads, …) |
 | `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
 
 Para agregar un objeto a la foto: su informer en `internal/conexion`, el campo en `foto.Objetos`,

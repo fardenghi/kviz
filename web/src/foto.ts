@@ -12,6 +12,8 @@ export interface Foto {
   nodos: Nodo[];
   /** Ordenados por namespace y nombre. */
   pods: Pod[];
+  /** Workloads de arriba de cada cadena de dueños, ordenados por namespace y nombre. */
+  workloads: Workload[];
 }
 
 export interface Nodo {
@@ -28,4 +30,35 @@ export interface Pod {
   ip: string | null;
   /** status.phase: Pending, Running, Succeeded, Failed o Unknown. */
   fase: string;
+  /** id del workload dueño del pod; null si es un Pod suelto. */
+  workload: string | null;
+}
+
+export type TipoDeWorkload = 'Deployment' | 'ReplicaSet' | 'StatefulSet' | 'DaemonSet' | 'Job' | 'CronJob';
+
+/**
+ * Workload de arriba de una cadena de dueños: Deployment, StatefulSet, DaemonSet, CronJob, o un
+ * ReplicaSet o Job sin dueño.
+ */
+export interface Workload {
+  /** `<Tipo>/<namespace>/<nombre>`, por ejemplo `Deployment/default/backend`. */
+  id: string;
+  tipo: TipoDeWorkload;
+  nombre: string;
+  namespace: string;
+  /** Color CSS propio del workload, estable entre actualizaciones. */
+  color: string;
+  /**
+   * Cadena de dueños de arriba hacia abajo: el workload y después sus ReplicaSets o Jobs, del más
+   * nuevo al más viejo. Durante un rollout trae los dos ReplicaSets.
+   */
+  cadena: Eslabon[];
+}
+
+/** Objeto de la cadena de dueños con los pods que crea directamente. */
+export interface Eslabon {
+  tipo: TipoDeWorkload;
+  nombre: string;
+  /** Nombres de sus pods (mismo namespace que el workload). */
+  pods: string[];
 }

@@ -1,6 +1,7 @@
 // Escena de la vista de topología (módulo 1 del frontend): función pura de foto + estado de la
 // interfaz a escena. Decide qué se dibuja, dónde y con qué texto; el lienzo solo la pinta.
-import type { Foto, Pod } from '../foto';
+import type { Foto, Pod, Workload } from '../foto';
+import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWorkload } from './workloads';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
 export interface EstadoInterfaz {
@@ -13,6 +14,8 @@ export interface EstadoInterfaz {
    * filtros los oculten, como el pod del Ingress Controller. Lo completa el recorrido (ticket 17).
    */
   podsDelRecorrido?: string[];
+  /** id del workload seleccionado en la lista de workloads. No es foco: solo resalta sus pods. */
+  workloadSeleccionado?: string | null;
 }
 
 export interface Caja {
@@ -38,6 +41,12 @@ export interface PodEnEscena extends Caja {
   ip: string | null;
   /** id de la región que lo contiene. */
   region: string;
+  /** Barra y etiqueta corta de su workload, en su color. */
+  workload: MarcaDeWorkload;
+  /** Con un workload seleccionado, el color del borde de sus pods; si no, null. */
+  bordeWorkload: string | null;
+  /** 1, o atenuado cuando hay un workload seleccionado y el pod no es suyo. */
+  opacidad: number;
 }
 
 export interface Escena {
@@ -86,12 +95,21 @@ export function namespacesDelFiltro(foto: Foto, estado: EstadoInterfaz = {}): st
   return [...nombres].sort();
 }
 
+/** Workloads de la lista: los de los namespaces que la vista muestra, con los mismos filtros que los pods. */
+export function workloadsVisibles(foto: Foto, estado: EstadoInterfaz = {}): Workload[] {
+  return (foto.workloads ?? []).filter(
+    (w) => pasaElInterruptor(w.namespace, estado) && (!estado.namespace || w.namespace === estado.namespace),
+  );
+}
+
 export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena {
   const M = MEDIDAS;
   const regiones: RegionEnEscena[] = [];
   const pods: PodEnEscena[] = [];
 
   const delRecorrido = new Set(estado.podsDelRecorrido);
+  const workloads = indiceDeWorkloads(foto);
+  const seleccionado = estado.workloadSeleccionado ? workloads.get(estado.workloadSeleccionado) : undefined;
   const visibles = foto.pods.filter((p) =>
     delRecorrido.has(idPod(p))
       ? p.namespace !== NAMESPACE_DE_KVIZ
@@ -126,6 +144,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         namespace: p.namespace,
         ip: p.ip,
         region: g.id,
+        workload: marcaDeWorkload(p, workloads),
+        ...seleccionDeWorkload(p, seleccionado),
         x: x + M.relleno + (i % M.columnas) * (M.anchoPod + M.hueco),
         y: y + M.cabecera + Math.floor(i / M.columnas) * (M.altoPod + M.hueco),
         ancho: M.anchoPod,
