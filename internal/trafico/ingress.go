@@ -39,7 +39,7 @@ func (c *calculo) desdeIngressController(ics []*foto.Pod) {
 	if m.reescrito != c.path {
 		paso.Detalle += fmt.Sprintf(" · path reescrito: %s → %s", c.path, m.reescrito)
 	}
-	s := serviceDe(c.f, m.regla.Service+"."+m.ingress.Namespace)
+	s := c.f.ServicePorID(foto.IDDe(m.ingress.Namespace, m.regla.Service))
 	if s == nil {
 		paso.Detalle += fmt.Sprintf(" · el Service %s no existe: el Ingress Controller responde 503", m.regla.Service)
 		c.con(paso)

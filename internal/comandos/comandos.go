@@ -53,38 +53,28 @@ func Para(f foto.Foto, o Objeto) (cs []Comando, ok bool) {
 	case MetricsServer:
 		return instalarMetricsServer(f.Contexto), true
 	case "Pod":
-		for _, p := range f.Pods {
-			if p.Namespace == o.Namespace && p.Nombre == o.Nombre {
-				return dePod(k, p), true
-			}
+		if p := f.PodPorID(foto.IDDe(o.Namespace, o.Nombre)); p != nil {
+			return dePod(k, *p), true
 		}
 	case "Service":
-		for _, sv := range f.Services {
-			if sv.Namespace == o.Namespace && sv.Nombre == o.Nombre {
-				return deService(k, sv), true
-			}
+		if s := f.ServicePorID(foto.IDDe(o.Namespace, o.Nombre)); s != nil {
+			return deService(k, *s), true
 		}
 	case "Ingress":
-		for _, i := range f.Ingress {
-			if i.Namespace == o.Namespace && i.Nombre == o.Nombre {
-				return []Comando{describe(k, "ingress", i.Nombre)}, true
-			}
+		if i := f.IngressPorID(foto.IDDe(o.Namespace, o.Nombre)); i != nil {
+			return []Comando{describe(k, "ingress", i.Nombre)}, true
 		}
 	case "Node":
-		for _, n := range f.Nodos {
-			if n.Nombre == o.Nombre {
-				k.namespace = ""
-				return []Comando{
-					describe(k, "node", n.Nombre),
-					{"Ver los pods del nodo, de todos los namespaces", k.linea("get pods -A -o wide", "--field-selector", "spec.nodeName="+n.Nombre)},
-				}, true
-			}
+		if n := f.NodoPorNombre(o.Nombre); n != nil {
+			k.namespace = ""
+			return []Comando{
+				describe(k, "node", n.Nombre),
+				{"Ver los pods del nodo, de todos los namespaces", k.linea("get pods -A -o wide", "--field-selector", "spec.nodeName="+n.Nombre)},
+			}, true
 		}
 	default:
-		for _, w := range f.Workloads {
-			if w.Tipo == o.Tipo && w.Namespace == o.Namespace && w.Nombre == o.Nombre {
-				return deWorkload(k, w), true
-			}
+		if w := f.WorkloadPorID(foto.IDDeWorkload(o.Tipo, o.Namespace, o.Nombre)); w != nil {
+			return deWorkload(k, *w), true
 		}
 	}
 	return nil, false

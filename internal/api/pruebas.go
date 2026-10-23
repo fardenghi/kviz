@@ -270,10 +270,7 @@ func upstreamsDelIngressController(ctx context.Context, cluster Cluster, f foto.
 // pedidoDeLogDelIngressController pide las últimas líneas del log del primer container normal
 // del pod del Ingress Controller.
 func pedidoDeLogDelIngressController(f foto.Foto, id string) (conexion.PedidoDeLogs, bool) {
-	for _, p := range f.Pods {
-		if p.ID != id {
-			continue
-		}
+	if p := f.PodPorID(id); p != nil {
 		for _, c := range p.Containers {
 			if c.Tipo == foto.ContainerNormal {
 				return conexion.PedidoDeLogs{Namespace: p.Namespace, Pod: p.Nombre, Container: c.Nombre, SinSeguir: true, Ultimas: 200}, true

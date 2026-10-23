@@ -69,7 +69,7 @@ func Recorrer(f foto.Foto, u *url.URL, ops ...Opcion) Recorrido {
 				Detalle: "Nombre de un nodo: el DNS lo resuelve a su InternalIP", Objetos: []Ref{refNodo(n.Nombre)}})
 		}
 		c.desdeNodo(n, puerto)
-	} else if p := podPorIP(f, host); p != nil && esIP {
+	} else if p := f.PodPorIP(host); p != nil && esIP {
 		c.r = c.r.conSalto(f, p)
 		c.con(Paso{Tipo: PasoPod, Titulo: fmt.Sprintf("%s %s:%d", p.Nombre, host, puerto),
 			Detalle: "IP de un pod: la request va directo al pod, sin Service ni kube-proxy", Objetos: []Ref{refPod(p)}})
@@ -123,7 +123,7 @@ func (c *calculo) desdeNodo(n *foto.Nodo, puerto int32) {
 	}
 	paso := Paso{Tipo: PasoPuerta, Titulo: fmt.Sprintf("%s :%d (%s)", n.Nombre, puerto, pu.Tipo), Objetos: []Ref{refPuerta(pu)}}
 	if pu.Service != nil {
-		s := serviceDe(c.f, *pu.Service+"."+pu.Namespace)
+		s := c.f.ServicePorID(foto.IDDe(pu.Namespace, *pu.Service))
 		paso.Detalle = fmt.Sprintf("kube-proxy del nodo la manda al Service %s", *pu.Service)
 		c.con(paso)
 		if s != nil {
@@ -131,7 +131,7 @@ func (c *calculo) desdeNodo(n *foto.Nodo, puerto int32) {
 		}
 		return
 	}
-	p := podDe(c.f, pu.Namespace+"/"+deref(pu.Pod))
+	p := c.f.PodPorID(foto.IDDe(pu.Namespace, deref(pu.Pod)))
 	if p == nil {
 		paso.Detalle = "El pod del hostPort ya no está"
 		c.con(paso)
@@ -188,8 +188,9 @@ func (c *calculo) desdeService(s *foto.Service, puerto intstr.IntOrString, ics [
 		}
 		direcciones = append(direcciones, e.IP+":"+p.TargetPort.String())
 		if e.Pod != nil {
-			pods = append(pods, Ref{Tipo: RefPod, ID: s.Namespace + "/" + *e.Pod})
-			if pod := podDe(c.f, s.Namespace+"/"+*e.Pod); pod != nil {
+			id := foto.IDDe(s.Namespace, *e.Pod)
+			pods = append(pods, Ref{Tipo: RefPod, ID: id})
+			if pod := c.f.PodPorID(id); pod != nil {
 				listos = append(listos, pod)
 			}
 		}
@@ -243,24 +244,6 @@ func puertaDe(f foto.Foto, nodo string, puerto int32) *foto.Puerta {
 		p := &f.Puertas[i]
 		if p.Nodo == nodo && p.Puerto == puerto && (p.Protocolo == "" || p.Protocolo == "TCP") {
 			return p
-		}
-	}
-	return nil
-}
-
-func podPorIP(f foto.Foto, ip string) *foto.Pod {
-	for i := range f.Pods {
-		if p := &f.Pods[i]; p.IP != nil && *p.IP == ip {
-			return p
-		}
-	}
-	return nil
-}
-
-func nodoPorNombre(f foto.Foto, nombre string) *foto.Nodo {
-	for i := range f.Nodos {
-		if f.Nodos[i].Nombre == nombre {
-			return &f.Nodos[i]
 		}
 	}
 	return nil

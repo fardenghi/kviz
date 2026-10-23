@@ -85,7 +85,7 @@ func (r Recorrido) conSalto(f foto.Foto, p *foto.Pod) Recorrido {
 	if desde == nil || p.Nodo == nil || *p.Nodo == desde.Nombre {
 		return r
 	}
-	hasta := nodoPorNombre(f, *p.Nodo)
+	hasta := f.NodoPorNombre(*p.Nodo)
 	if hasta == nil {
 		return r
 	}
@@ -112,21 +112,21 @@ func nodoDeEntrada(f foto.Foto, r Recorrido) (nodo *foto.Nodo, delSondeo bool) {
 		case PasoPuerta:
 			directo = false
 			for _, o := range paso.Objetos {
-				if pu := puertaPorID(f, o.ID); o.Tipo == RefPuerta && pu != nil {
-					nodo = nodoPorNombre(f, pu.Nodo)
+				if pu := f.PuertaPorID(o.ID); o.Tipo == RefPuerta && pu != nil {
+					nodo = f.NodoPorNombre(pu.Nodo)
 				}
 			}
 		case PasoIngress:
 			directo = false
 			if ics := PodsDelIngressController(Recorrido{Pasos: []Paso{paso}}); len(ics) == 1 {
-				if p := podDe(f, ics[0].ID); p != nil && p.Nodo != nil {
-					nodo = nodoPorNombre(f, *p.Nodo)
+				if p := f.PodPorID(ics[0].ID); p != nil && p.Nodo != nil {
+					nodo = f.NodoPorNombre(*p.Nodo)
 				}
 			}
 		}
 	}
 	if directo && r.sondeo != "" {
-		return nodoPorNombre(f, r.sondeo), true
+		return f.NodoPorNombre(r.sondeo), true
 	}
 	return nodo, false
 }
@@ -178,19 +178,10 @@ func podsDeLosEndpoints(f foto.Foto, r Recorrido) []*foto.Pod {
 			continue
 		}
 		for _, o := range paso.Objetos {
-			if p := podDe(f, o.ID); p != nil {
+			if p := f.PodPorID(o.ID); p != nil {
 				out = append(out, p)
 			}
 		}
 	}
 	return out
-}
-
-func puertaPorID(f foto.Foto, id string) *foto.Puerta {
-	for i := range f.Puertas {
-		if f.Puertas[i].ID == id {
-			return &f.Puertas[i]
-		}
-	}
-	return nil
 }

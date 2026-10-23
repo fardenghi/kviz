@@ -186,12 +186,3 @@ func puertoDelService(s *foto.Service, puerto intstr.IntOrString) *foto.PuertoSe
 	}
 	return nil
 }
-
-func podDe(f foto.Foto, id string) *foto.Pod {
-	for i := range f.Pods {
-		if f.Pods[i].ID == id {
-			return &f.Pods[i]
-		}
-	}
-	return nil
-}
