@@ -35,6 +35,10 @@ type Foto struct {
 	Ingress []Ingress `json:"ingress"`
 	// Puertas ordenadas por id (nodo, puerto y protocolo).
 	Puertas []Puerta `json:"puertas"`
+	// ConfigMaps con su contenido, ordenados por id (namespace y nombre).
+	ConfigMaps []ConfigMap `json:"configMaps"`
+	// Secrets sin valores (solo sus claves), ordenados por id (namespace y nombre).
+	Secrets []Secret `json:"secrets"`
 }
 
 type Nodo struct {
@@ -70,6 +74,8 @@ type Pod struct {
 	Workload *string `json:"workload"`
 	// HostPorts son los puertos de sus containers que se abren en su nodo.
 	HostPorts []HostPort `json:"hostPorts"`
+	// Volumenes del pod, en el orden de spec.volumes (ver volumenes.go).
+	Volumenes []Volumen `json:"volumenes"`
 }
 
 // Service es un Service con sus endpoints, tomados de sus EndpointSlices.
@@ -121,6 +127,9 @@ type Objetos struct {
 	Services       []*corev1.Service
 	EndpointSlices []*discoveryv1.EndpointSlice
 	Ingress        []*networkingv1.Ingress
+	ConfigMaps     []*corev1.ConfigMap
+	// Secrets: de acá solo salen sus claves; los valores nunca llegan a la foto (ver env.go).
+	Secrets []*corev1.Secret
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
@@ -152,13 +161,17 @@ func Construir(contexto string, o Objetos) Foto {
 		})
 	}
 	sort.Slice(f.Pods, func(i, j int) bool { return f.Pods[i].ID < f.Pods[j].ID })
+	completarEnv(f.Pods, o)
+	f.ConfigMaps, f.Secrets = configMaps(o), secrets(o)
 	f.Puertas = puertas(f.Nodos, f.Services, o)
 	return f
 }
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
+	f := Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
+	f.ConfigMaps, f.Secrets = []ConfigMap{}, []Secret{}
+	return f
 }
 
 func services(o Objetos) []Service {

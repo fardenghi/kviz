@@ -26,6 +26,10 @@ type Container struct {
 	Ready     bool   `json:"ready"`
 	Started   bool   `json:"started"`
 	Reinicios int32  `json:"reinicios"`
+	// Env son sus variables de entorno con su origen (ver env.go).
+	Env []Variable `json:"env"`
+	// Montajes son los volúmenes del pod montados en el container (ver volumenes.go).
+	Montajes []Montaje `json:"montajes"`
 }
 
 type Puerto struct {

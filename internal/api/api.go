@@ -9,6 +9,7 @@
 //	POST /api/contexto   cambia de contexto en caliente
 //	GET /api/comandos?tipo=Pod&namespace=default&nombre=nginx
 //	                comandos sugeridos de un objeto de la foto (ver internal/comandos); 404 si no está
+//	POST /api/secreto    revela el valor de una clave de un Secret: {"namespace", "nombre", "clave"} → {"valor"} (ver secreto.go)
 //	GET /           la interfaz compilada (web/dist)
 package api
 
@@ -29,6 +30,9 @@ type Cluster interface {
 	Contextos() (actual string, todos []string, err error)
 	// CambiarContexto se conecta en caliente al cluster de otro contexto.
 	CambiarContexto(contexto string) error
+	// ValorDeSecret revela el valor de una clave de un Secret (conexion.ErrSecretInexistente si
+	// no existe). Es el único camino por el que un valor de Secret sale de kviz.
+	ValorDeSecret(namespace, nombre, clave string) (string, error)
 }
 
 // Nuevo arma el handler HTTP de kviz. ui sirve la interfaz (web.Handler); si es nil no se sirve.
@@ -40,6 +44,7 @@ func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/stream", transmitirFoto(cluster))
 	mux.HandleFunc("GET /api/contextos", listarContextos(cluster))
 	mux.HandleFunc("POST /api/contexto", cambiarContexto(cluster))
+	mux.HandleFunc("POST /api/secreto", revelarSecret(cluster))
 	mux.HandleFunc("GET /api/comandos", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		cs, ok := comandos.Para(cluster.Foto(), comandos.Objeto{Tipo: q.Get("tipo"), Namespace: q.Get("namespace"), Nombre: q.Get("nombre")})
