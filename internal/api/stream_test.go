@@ -134,6 +134,20 @@ func TestUnEndpointQueEntraLlegaComoCambioDeSuService(t *testing.T) {
 	}
 }
 
+func TestUnWorkloadNuevoLlegaComoActualizacion(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab")
+	stream := kviz.abrirStream(t)
+	stream.siguiente(t)
+
+	if _, err := kviz.cliente.AppsV1().StatefulSets("default").Create(context.Background(), statefulSet("default", "db"), metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if c := stream.esperarCambio(t, "workloads", "StatefulSet/default/db"); c.Borrado {
+		t.Fatalf("cambio = %s, want el alta del StatefulSet", mostrar(c))
+	}
+}
+
 func TestCadaPestanaRecibeLasActualizaciones(t *testing.T) {
 	kviz := nuevoKviz(t, "kind-lab", nodo("lab-worker", "172.23.0.4"))
 	a, b := kviz.abrirStream(t), kviz.abrirStream(t)

@@ -1,11 +1,21 @@
 // Lienzo (módulo 2 del frontend): dibuja la escena en SVG, con zoom por rueda, arrastre y botón de
 // encuadrar. No decide nada sobre el cluster: todo lo que dibuja viene de la escena.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import type { ConexionEnEscena, Escena, PodEnEscena, RegionEnEscena, ServiceEnEscena } from '../escena/escena';
 import { BRILLO_POD_NUEVO } from '../tiempoReal';
 import { encuadrar, type Vista, zoomEn } from './vista';
 
-export function Lienzo({ escena }: { escena: Escena }) {
+export function Lienzo({
+  escena,
+  alClicEnVacio,
+  children,
+}: {
+  escena: Escena;
+  /** Clic sobre el fondo, sin arrastrar: limpia la selección. */
+  alClicEnVacio?: () => void;
+  /** Superficies flotantes que van arriba del lienzo. */
+  children?: ReactNode;
+}) {
   const marco = useRef<HTMLDivElement>(null);
   const [vista, setVista] = useState<Vista>({ x: 0, y: 0, escala: 1 });
   const arrastre = useRef<{ x: number; y: number; desde: Vista } | null>(null);
@@ -49,7 +59,12 @@ export function Lienzo({ escena }: { escena: Escena }) {
         const a = arrastre.current;
         if (a) setVista({ ...a.desde, x: a.desde.x + e.clientX - a.x, y: a.desde.y + e.clientY - a.y });
       }}
-      onMouseUp={() => (arrastre.current = null)}
+      onMouseUp={(e) => {
+        const a = arrastre.current;
+        arrastre.current = null;
+        const quieto = a && Math.abs(e.clientX - a.x) + Math.abs(e.clientY - a.y) < 4;
+        if (quieto && !(e.target as Element).closest('.objeto')) alClicEnVacio?.();
+      }}
       onMouseLeave={() => (arrastre.current = null)}
     >
       <svg className="lienzo-svg">
@@ -75,6 +90,8 @@ export function Lienzo({ escena }: { escena: Escena }) {
           ))}
         </g>
       </svg>
+
+      {children}
 
       <div className="flotante zoom">
         <button className="boton" title="Acercar" onClick={() => zoomCentro(1.2)}>+</button>
@@ -126,12 +143,24 @@ const recortar = (texto: string, ancho: number) => {
   return texto.length > max ? texto.slice(0, max - 1) + '…' : texto;
 };
 
-// un pod nuevo brilla BRILLO_POD_NUEVO.veces y para; uno Terminating queda atenuado
+// un pod nuevo brilla BRILLO_POD_NUEVO.veces y para; uno Terminating queda punteado (la escena lo atenúa)
 const brillo = { animation: `brillo ${BRILLO_POD_NUEVO.msPorVez}ms ease-in-out ${BRILLO_POD_NUEVO.veces}` };
 
+// la etiqueta del workload va a la derecha, en la línea de la IP, cortada con el espacio que deja
+// la IP (aprox. 6.4 px por letra de la IP en mono y 5.6 px por letra de la etiqueta)
+const recortarEtiqueta = (texto: string, ip: string, ancho: number) => {
+  const max = Math.floor((ancho - 13 - 10 - 10 - ip.length * 6.4) / 5.6);
+  return texto.length > max ? texto.slice(0, Math.max(1, max - 1)) + '…' : texto;
+};
+
 function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
+  // el lienzo no recorta el SVG: la barra se dibuja adentro de la tarjeta con su propio clip
+  const clip = `clip-${p.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   return (
-    <g className={p.terminando ? 'pod-terminando' : undefined}>
+    <g opacity={p.opacidad} className={p.terminando ? 'objeto pod-terminando' : 'objeto'}>
+      <clipPath id={clip}>
+        <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={8} />
+      </clipPath>
       <rect
         x={p.x}
         y={p.y}
@@ -139,8 +168,12 @@ function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
         height={p.alto}
         rx={8}
         className={['pod', p.tonoEstado === 'mal' && 'pod-mal', p.nuevo && 'pod-nuevo'].filter(Boolean).join(' ')}
-        style={p.nuevo ? brillo : undefined}
+        style={{
+          ...(p.bordeWorkload ? { stroke: p.bordeWorkload, strokeWidth: 2.5 } : {}),
+          ...(p.nuevo ? brillo : {}),
+        }}
       />
+      <rect x={p.x} y={p.y} width={4} height={p.alto} fill={p.workload.color} clipPath={`url(#${clip})`} />
       <text x={p.x + 13} y={p.y + 18} className="pod-nombre">
         {p.nombreVisible}
         <title>{`${p.nombre} · namespace ${p.namespace}`}</title>
@@ -151,6 +184,10 @@ function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
         </text>
       )}
       <text x={p.x + 13} y={p.y + 33} className="mono tenue">{p.ip ?? 'sin IP'}</text>
+      <text x={p.x + p.ancho - 8} y={p.y + 33} textAnchor="end" className="pod-workload" fill={p.workload.color}>
+        {recortarEtiqueta(p.workload.etiqueta, p.ip ?? 'sin IP', p.ancho)}
+        <title>{p.workload.etiqueta}</title>
+      </text>
       {p.containers.map((c, i) => (
         <g key={c.nombre || `+${i}`}>
           <rect

@@ -14,8 +14,17 @@ const pod = (nombre: string, nodo: string | null, ip: string | null = '10.244.0.
   fase: nodo ? 'Running' : 'Pending',
   estado: nodo ? 'Running' : 'Pending',
   containers: [],
+  workload: null,
 });
-const foto = (parte: Partial<Foto>): Foto => ({ contexto: 'kind-lab', conectado: true, nodos: [], pods: [], services: [], ...parte });
+const foto = (parte: Partial<Foto>): Foto => ({
+  contexto: 'kind-lab',
+  conectado: true,
+  nodos: [],
+  pods: [],
+  workloads: [],
+  services: [],
+  ...parte,
+});
 
 describe('regiones de nodo', () => {
   it('ubica los nodos lado a lado, en el orden de la foto y sin pisarse', () => {
@@ -187,5 +196,5 @@ function podEn(namespace: string, nombre: string, nodo: string | null): Pod {
   return { ...pod(nombre, nodo), namespace };
 }
 
-const adentro =(c: Caja, region: Caja) =>
+const adentro = (c: Caja, region: Caja) =>
   c.x >= region.x && c.y >= region.y && c.x + c.ancho <= region.x + region.ancho && c.y + c.alto <= region.y + region.alto;

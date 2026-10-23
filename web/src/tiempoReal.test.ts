@@ -14,6 +14,7 @@ const pod = (nombre: string, parte: Partial<Pod> = {}): Pod => ({
   fase: 'Running',
   estado: 'Running',
   containers: [],
+  workload: null,
   ...parte,
 });
 const foto = (pods: Pod[]): Foto => ({
@@ -22,6 +23,7 @@ const foto = (pods: Pod[]): Foto => ({
   nodos: [{ id: 'lab-worker', nombre: 'lab-worker', internalIP: '172.23.0.4' }],
   pods,
   services: [],
+  workloads: [],
 });
 
 const recibirTodos = (mensajes: Mensaje[], ahora = 0): EnVivo =>
@@ -76,8 +78,8 @@ describe('pods Terminating', () => {
       { tipo: 'cambios', cambios: [{ seccion: 'pods', id: 'default/web-1', valor: pod('web-1', { estado: 'Terminating' }) }] },
     ]);
 
-    expect(enEscena(terminando, 0, 'web-1').terminando).toBe(true);
-    expect(enEscena(terminando, 0, 'nginx').terminando).toBe(false);
+    expect(enEscena(terminando, 0, 'web-1')).toMatchObject({ terminando: true, opacidad: 0.4 });
+    expect(enEscena(terminando, 0, 'nginx')).toMatchObject({ terminando: false, opacidad: 1 });
 
     const borrado = recibir(terminando, { tipo: 'cambios', cambios: [{ seccion: 'pods', id: 'default/web-1', borrado: true }] }, 0);
     expect(escenaEn(borrado, 0).pods.map((p) => p.nombre)).toEqual(['nginx']);

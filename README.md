@@ -43,13 +43,15 @@ sirve una página que explica cómo compilarla.
 |---|---|
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
 | `internal/conexion/` | 1 · conexión al cluster: contexto de kubectl, informers, conectado/desconectado |
-| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON) y sus cambios (`cambios.go`) |
+| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream |
 | `internal/api/` | 12 · API HTTP (`GET /api/foto`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
 | `web/src/escena/` | escena de la vista de topología: función pura (costura 2) |
+| `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
+| `web/src/superficies/` | superficies flotantes (lista de workloads, …) |
 | `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
 
 Para agregar un objeto a la foto: su informer en `internal/conexion` (con el handler de avisos, para

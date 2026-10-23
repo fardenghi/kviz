@@ -24,6 +24,7 @@ const pod = (nombre: string, parte: Partial<Pod> = {}): Pod => ({
   fase: 'Running',
   estado: 'Running',
   containers: [container('app')],
+  workload: null,
   ...parte,
 });
 const foto = (...pods: Pod[]): Foto => ({
@@ -32,6 +33,7 @@ const foto = (...pods: Pod[]): Foto => ({
   nodos: [{ id: 'lab-worker', nombre: 'lab-worker', internalIP: '172.23.0.4' }],
   pods,
   services: [],
+  workloads: [],
 });
 const tarjeta = (escena: { pods: PodEnEscena[] }, nombre: string) => escena.pods.find((p) => p.nombre === nombre)!;
 

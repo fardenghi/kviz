@@ -17,6 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	listersappsv1 "k8s.io/client-go/listers/apps/v1"
+	listersbatchv1 "k8s.io/client-go/listers/batch/v1"
 	listerscorev1 "k8s.io/client-go/listers/core/v1"
 	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	"k8s.io/client-go/tools/cache"
@@ -36,6 +38,12 @@ type Conexion struct {
 	avisos       avisos
 	nodos        listerscorev1.NodeLister
 	pods         listerscorev1.PodLister
+	deployments  listersappsv1.DeploymentLister
+	replicaSets  listersappsv1.ReplicaSetLister
+	statefulSets listersappsv1.StatefulSetLister
+	daemonSets   listersappsv1.DaemonSetLister
+	jobs         listersbatchv1.JobLister
+	cronJobs     listersbatchv1.CronJobLister
 	services     listerscorev1.ServiceLister
 	slices       listersdiscoveryv1.EndpointSliceLister
 }
@@ -93,15 +101,32 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	slices := fabrica.Discovery().V1().EndpointSlices()
 	c.services = services.Lister()
 	c.slices = slices.Lister()
-	for _, inf := range []cache.SharedIndexInformer{nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer()} {
+	apps, batch := fabrica.Apps().V1(), fabrica.Batch().V1()
+	c.deployments = apps.Deployments().Lister()
+	c.replicaSets = apps.ReplicaSets().Lister()
+	c.statefulSets = apps.StatefulSets().Lister()
+	c.daemonSets = apps.DaemonSets().Lister()
+	c.jobs = batch.Jobs().Lister()
+	c.cronJobs = batch.CronJobs().Lister()
+
+	// cada alta, modificación o baja de un objeto observado avisa al stream
+	for _, inf := range []cache.SharedIndexInformer{
+		nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(),
+		apps.Deployments().Informer(), apps.ReplicaSets().Informer(), apps.StatefulSets().Informer(),
+		apps.DaemonSets().Informer(), batch.Jobs().Informer(), batch.CronJobs().Informer(),
+	} {
 		if _, err := inf.AddEventHandler(c.avisos.alCambiar()); err != nil {
 			return err
 		}
 	}
 
 	fabrica.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), nodos.Informer().HasSynced, pods.Informer().HasSynced,
-		services.Informer().HasSynced, slices.Informer().HasSynced) {
+	sincronizados := fabrica.WaitForCacheSync(ctx.Done())
+	todos := len(sincronizados) > 0
+	for _, ok := range sincronizados {
+		todos = todos && ok
+	}
+	if !todos {
 		return fmt.Errorf("no se pudo sincronizar con el cluster %q", c.contexto)
 	}
 	c.sincronizada.Store(true)
@@ -116,7 +141,14 @@ func (c *Conexion) Objetos() foto.Objetos {
 	pods, _ := c.pods.List(labels.Everything())
 	services, _ := c.services.List(labels.Everything())
 	slices, _ := c.slices.List(labels.Everything())
-	return foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices}
+	o := foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices}
+	o.Deployments, _ = c.deployments.List(labels.Everything())
+	o.ReplicaSets, _ = c.replicaSets.List(labels.Everything())
+	o.StatefulSets, _ = c.statefulSets.List(labels.Everything())
+	o.DaemonSets, _ = c.daemonSets.List(labels.Everything())
+	o.Jobs, _ = c.jobs.List(labels.Everything())
+	o.CronJobs, _ = c.cronJobs.List(labels.Everything())
+	return o
 }
 
 // Foto es la foto actual del cluster, o una foto desconectada con el motivo.

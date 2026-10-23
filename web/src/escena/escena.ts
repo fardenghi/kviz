@@ -1,6 +1,7 @@
 // Escena de la vista de topología (módulo 1 del frontend): función pura de foto + estado de la
 // interfaz a escena. Decide qué se dibuja, dónde y con qué texto; el lienzo solo la pinta.
-import type { Foto, Pod, PuertoService, Service } from '../foto';
+import type { Foto, Pod, PuertoService, Service, Workload } from '../foto';
+import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWorkload } from './workloads';
 import { type MarcasPod, marcasDePod } from './marcas-pod';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
@@ -18,6 +19,8 @@ export interface EstadoInterfaz {
   podsDelRecorrido?: string[];
   /** ids de escena de los pods que acaban de aparecer y tienen que brillar (ver tiempoReal.ts). */
   podsNuevos?: ReadonlySet<string>;
+  /** id del workload seleccionado en la lista de workloads. No es foco: solo resalta sus pods. */
+  workloadSeleccionado?: string | null;
 }
 
 export interface Caja {
@@ -45,8 +48,14 @@ export interface PodEnEscena extends Caja, MarcasPod {
   region: string;
   /** Acaba de aparecer: brilla 3 veces. */
   nuevo: boolean;
-  /** Se está borrando (`Terminating`): se ve atenuado hasta que desaparece. */
+  /** Se está borrando (`Terminating`): se ve atenuado (ver opacidad) y punteado hasta que desaparece. */
   terminando: boolean;
+  /** Barra y etiqueta corta de su workload, en su color. */
+  workload: MarcaDeWorkload;
+  /** Con un workload seleccionado, el color del borde de sus pods; si no, null. */
+  bordeWorkload: string | null;
+  /** 1, o atenuado cuando hay un workload seleccionado y el pod no es suyo, o si es Terminating. */
+  opacidad: number;
 }
 
 export interface ServiceEnEscena extends Caja {
@@ -134,10 +143,24 @@ const pasaElInterruptor = (ns: string, estado: EstadoInterfaz) =>
 const seVe = (ns: string, estado: EstadoInterfaz) =>
   pasaElInterruptor(ns, estado) && (!estado.namespace || ns === estado.namespace);
 
+/** Opacidad de un pod Terminating: se ve atenuado hasta que desaparece de la foto. */
+export const OPACIDAD_TERMINANDO = 0.4;
+
+/** Un pod Terminating queda atenuado, y más si además lo atenúa la selección de un workload. */
+function terminando<T extends { opacidad: number }>(p: Pod, marcas: T): T & { terminando: boolean } {
+  const terminando = p.estado === 'Terminating';
+  return { ...marcas, terminando, opacidad: terminando ? Math.min(marcas.opacidad, OPACIDAD_TERMINANDO) : marcas.opacidad };
+}
+
 /** Namespaces que ofrece el filtro: los que tienen pods, sin los del sistema mientras están ocultos. */
 export function namespacesDelFiltro(foto: Foto, estado: EstadoInterfaz = {}): string[] {
   const nombres = new Set(foto.pods.map((p) => p.namespace).filter((ns) => pasaElInterruptor(ns, estado)));
   return [...nombres].sort();
+}
+
+/** Workloads de la lista: los de los namespaces que la vista muestra, con los mismos filtros que los pods. */
+export function workloadsVisibles(foto: Foto, estado: EstadoInterfaz = {}): Workload[] {
+  return (foto.workloads ?? []).filter((w) => seVe(w.namespace, estado));
 }
 
 export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena {
@@ -147,6 +170,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const pods: PodEnEscena[] = [];
 
   const delRecorrido = new Set(estado.podsDelRecorrido);
+  const workloads = indiceDeWorkloads(foto);
+  const seleccionado = estado.workloadSeleccionado ? workloads.get(estado.workloadSeleccionado) : undefined;
   const visibles = foto.pods.filter((p) =>
     delRecorrido.has(idPod(p))
       ? p.namespace !== NAMESPACE_DE_KVIZ
@@ -188,7 +213,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         ip: p.ip,
         region: g.id,
         nuevo: estado.podsNuevos?.has(idPod(p)) ?? false,
-        terminando: p.estado === 'Terminating',
+        ...terminando(p, seleccionDeWorkload(p, seleccionado)),
+        workload: marcaDeWorkload(p, workloads),
         ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
         ...tarjeta,
       });

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { escucharFoto } from './api';
-import { construirEscena, namespacesDelFiltro } from './escena/escena';
+import { construirEscena, namespacesDelFiltro, workloadsVisibles } from './escena/escena';
 import { Lienzo } from './lienzo/Lienzo';
+import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
 import { EN_VIVO_INICIAL, type EnVivo, finDelBrillo, podsNuevos, recibir } from './tiempoReal';
 
 export function App() {
@@ -12,6 +13,7 @@ export function App() {
   const [finBrillo, setFinBrillo] = useState(0);
   const [mostrarSistema, setMostrarSistema] = useState(false);
   const [namespace, setNamespace] = useState<string | null>(null);
+  const [workload, setWorkload] = useState<string | null>(null);
 
   useEffect(
     () =>
@@ -36,6 +38,12 @@ export function App() {
   const namespaces = useMemo(() => (foto ? namespacesDelFiltro(foto, { mostrarSistema }) : []), [foto, mostrarSistema]);
   // si el namespace elegido deja de ofrecerse (se ocultó el sistema o se fue), el filtro vuelve a "todos"
   const filtro = namespace !== null && namespaces.includes(namespace) ? namespace : null;
+  const workloads = useMemo(
+    () => (foto ? workloadsVisibles(foto, { mostrarSistema, namespace: filtro }) : []),
+    [foto, mostrarSistema, filtro],
+  );
+  // si el workload seleccionado se borra o queda oculto por los filtros, se deselecciona
+  const workloadSeleccionado = workload !== null && workloads.some((w) => w.id === workload) ? workload : null;
   const escena = useMemo(
     () =>
       foto?.conectado
@@ -43,10 +51,11 @@ export function App() {
             fotoAnterior: enVivo.anterior ?? undefined,
             mostrarSistema,
             namespace: filtro,
+            workloadSeleccionado,
             podsNuevos: podsNuevos(enVivo, Date.now()),
           })
         : null,
-    [enVivo, finBrillo, mostrarSistema, filtro], // eslint-disable-line react-hooks/exhaustive-deps
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (
@@ -83,7 +92,11 @@ export function App() {
       {cortado && <div className="aviso">Se cortó la conexión con kviz; reintentando…</div>}
       {!cortado && !foto && <div className="aviso">Cargando…</div>}
       {!cortado && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
-      {escena && <Lienzo escena={escena} />}
+      {escena && (
+        <Lienzo escena={escena} alClicEnVacio={() => setWorkload(null)}>
+          <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={setWorkload} />
+        </Lienzo>
+      )}
     </div>
   );
 }
