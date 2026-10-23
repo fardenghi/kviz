@@ -1,8 +1,9 @@
 // Service: botón "Enviar request" por cada puerto TCP, que abre el formulario de request de prueba
 // con el destino ya completado (el nombre DNS del Service y el puerto), y uno por nodePort para
 // entrar por un nodo. Ingress: uno por cada puerta de hostPort :80 (la del Ingress Controller),
-// con el path de su primera regla.
-import type { Foto, Ingress } from '../../foto';
+// con el path de su primera regla. Pod: uno por cada puerto TCP de sus containers, a la IP del pod
+// (o uno a la IP sola, puerto 80, si no declara puertos).
+import type { Foto, Ingress, Pod } from '../../foto';
 import type { PropsDeSeccion } from '../detalle';
 import { Seccion } from '../ui';
 
@@ -10,6 +11,7 @@ export const orden = 15;
 
 export default function RequestDePrueba({ detalle, foto, probar }: PropsDeSeccion) {
   if (detalle.tipo === 'Ingress' && probar) return <PorElIngress ingress={detalle.ingress} foto={foto} probar={probar} />;
+  if (detalle.tipo === 'Pod' && probar) return <AlPod pod={detalle.pod} probar={probar} />;
   if (detalle.tipo !== 'Service' || !probar) return null;
   const s = detalle.service;
   const puertos = s.puertos.filter((p) => !p.protocolo || p.protocolo === 'TCP');
@@ -51,6 +53,33 @@ function PorElIngress({ ingress, foto, probar }: { ingress: Ingress; foto: Foto;
         {puertas.map((p) => (
           <button key={p.id} className="boton" onClick={() => probar(`${p.nodo}:80${path}`)} title={`Request de prueba a ${p.nodo}:80${path}`}>
             Enviar request por {p.nodo}:80
+          </button>
+        ))}
+      </div>
+    </Seccion>
+  );
+}
+
+/** Un pod se prueba por su IP, directo, sin Service ni kube-proxy. */
+function AlPod({ pod, probar }: { pod: Pod; probar: (destino: string) => void }) {
+  if (!pod.ip) return null;
+  const ip = pod.ip;
+  const puertos = [
+    ...new Set(
+      pod.containers
+        .filter((c) => c.tipo === 'normal')
+        .flatMap((c) => c.puertos)
+        .filter((p) => !p.protocolo || p.protocolo === 'TCP')
+        .map((p) => p.numero),
+    ),
+  ].sort((a, b) => a - b);
+  const destinos = puertos.length > 0 ? puertos.map((p) => `${ip}:${p}`) : [ip];
+  return (
+    <Seccion>
+      <div className="acciones-pedido">
+        {destinos.map((d) => (
+          <button key={d} className="boton" onClick={() => probar(d)} title={`Request de prueba a ${d}, directo al pod`}>
+            Enviar request{destinos.length > 1 ? ` a :${d.slice(ip.length + 1)}` : ''}
           </button>
         ))}
       </div>
