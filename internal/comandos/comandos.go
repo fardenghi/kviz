@@ -195,6 +195,13 @@ func mapeo(puertos []int32) []string {
 	return pares
 }
 
+// Linea es "kubectl <verbo> <args> -n <namespace> --context <contexto>", con el contexto entre
+// comillas si la shell lo interpretaría; sin namespace o sin contexto, sin esas opciones. Los args
+// van tal cual: el que tenga caracteres de la shell tiene que venir ya entre comillas.
+func Linea(contexto, namespace, verbo string, args ...string) string {
+	return kubectl{contexto: contexto, namespace: namespace}.linea(verbo, args...)
+}
+
 // kubectl arma líneas de kubectl con el namespace y el contexto del objeto.
 type kubectl struct{ contexto, namespace string }
 

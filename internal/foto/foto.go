@@ -35,6 +35,9 @@ type Foto struct {
 	Ingress []Ingress `json:"ingress"`
 	// Puertas ordenadas por id (nodo, puerto y protocolo).
 	Puertas []Puerta `json:"puertas"`
+	// Advertencias de configuración ordenadas por id (ver advertencias.go). Las calcula
+	// internal/advertencias sobre la foto ya construida.
+	Advertencias []Advertencia `json:"advertencias"`
 }
 
 type Nodo struct {
@@ -121,12 +124,13 @@ type Objetos struct {
 	Services       []*corev1.Service
 	EndpointSlices []*discoveryv1.EndpointSlice
 	Ingress        []*networkingv1.Ingress
+	IngressClasses []*networkingv1.IngressClass
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
 // (nodos por nombre, pods por namespace y nombre), así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
-	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Workloads: []Workload{}, Ingress: ingresses(o)}
+	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Workloads: []Workload{}, Ingress: ingresses(o), Advertencias: []Advertencia{}}
 	for _, n := range o.Nodos {
 		f.Nodos = append(f.Nodos, Nodo{ID: n.Name, Nombre: n.Name, InternalIP: internalIP(n), Capacidad: capacidadDe(n)})
 	}
@@ -158,7 +162,7 @@ func Construir(contexto string, o Objetos) Foto {
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
+	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Workloads: []Workload{}, Ingress: []Ingress{}, Puertas: []Puerta{}, Advertencias: []Advertencia{}}
 }
 
 func services(o Objetos) []Service {
