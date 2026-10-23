@@ -266,6 +266,13 @@ func (kc *kubeconfigDePrueba) crearCluster(contexto string, objetos ...runtime.O
 	c.cliente.PrependWatchReactor("*", func(k8stesting.Action) (bool, watch.Interface, error) {
 		return c.caido.Load(), nil, sinRespuesta
 	})
+	// el scheduler y el kubelet: un pod creado (el pod de sondeo) queda corriendo en un nodo
+	c.cliente.PrependReactor("create", "pods", func(a k8stesting.Action) (bool, runtime.Object, error) {
+		if p, ok := a.(k8stesting.CreateAction).GetObject().(*corev1.Pod); ok && p.Status.Phase == "" {
+			p.Spec.NodeName, p.Status.Phase, p.Status.PodIP = "lab-control-plane", corev1.PodRunning, "10.244.0.9"
+		}
+		return false, nil, nil
+	})
 	kc.mu.Lock()
 	defer kc.mu.Unlock()
 	kc.clusters[contexto] = c

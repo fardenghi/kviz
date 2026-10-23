@@ -19,6 +19,7 @@ import (
 
 	"kviz/internal/api"
 	"kviz/internal/conexion"
+	"kviz/internal/sondeo"
 	"kviz/web"
 )
 
@@ -34,7 +35,8 @@ func main() {
 	ctx, parar := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer parar()
 
-	c := conexion.NuevoGestor(conexion.KubeconfigDeKubectl(), conexion.IntervaloDeVigilancia)
+	c := conexion.NuevoGestor(conexion.KubeconfigDeKubectl(), conexion.IntervaloDeVigilancia,
+		sondeo.EjecutorPorExec(conexion.ConfigDeKubectl))
 	c.Iniciar(ctx)
 	if c.Contexto() == "" {
 		log.Print("sin contexto de kubectl: arranco desconectado")
@@ -72,6 +74,12 @@ func main() {
 	apagar, cancelar := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancelar()
 	_ = srv.Shutdown(apagar)
+	// la única escritura de kviz en el cluster se deshace al cerrar
+	borrar, cancelarBorrado := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelarBorrado()
+	if err := c.Cerrar(borrar); err != nil {
+		log.Printf("no pude borrar el pod de sondeo (%v); se limpia la próxima vez que arranque kviz", err)
+	}
 }
 
 // escuchar abre el puerto pedido en 127.0.0.1 (nunca en otras interfaces). Si está ocupado,

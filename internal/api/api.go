@@ -7,6 +7,7 @@
 //	GET /api/stream canal de streaming (Server-Sent Events): la foto y sus cambios (ver stream.go)
 //	GET /api/contextos   el contexto de kviz y los contextos del kubeconfig (ver contexto.go)
 //	POST /api/contexto   cambia de contexto en caliente
+//	POST /api/pruebas   request de prueba desde el pod de sondeo, con su respuesta y recorrido (ver pruebas.go)
 //	GET /api/comandos?tipo=Pod&namespace=default&nombre=nginx
 //	                comandos sugeridos de un objeto de la foto (ver internal/comandos); 404 si no está
 //	GET /           la interfaz compilada (web/dist)
@@ -15,9 +16,11 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sync/atomic"
 
 	"kviz/internal/comandos"
 	"kviz/internal/foto"
+	"kviz/internal/sondeo"
 )
 
 // Cluster es lo que la API necesita del cluster conectado.
@@ -29,6 +32,8 @@ type Cluster interface {
 	Contextos() (actual string, todos []string, err error)
 	// CambiarContexto se conecta en caliente al cluster de otro contexto.
 	CambiarContexto(contexto string) error
+	// Sondeo es el pod de sondeo del cluster conectado; error si kviz no está conectado.
+	Sondeo() (*sondeo.Sondeo, error)
 }
 
 // Nuevo arma el handler HTTP de kviz. ui sirve la interfaz (web.Handler); si es nil no se sirve.
@@ -40,6 +45,7 @@ func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/stream", transmitirFoto(cluster))
 	mux.HandleFunc("GET /api/contextos", listarContextos(cluster))
 	mux.HandleFunc("POST /api/contexto", cambiarContexto(cluster))
+	mux.HandleFunc("POST /api/pruebas", mandarPrueba(cluster, new(atomic.Int64)))
 	mux.HandleFunc("GET /api/comandos", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		cs, ok := comandos.Para(cluster.Foto(), comandos.Objeto{Tipo: q.Get("tipo"), Namespace: q.Get("namespace"), Nombre: q.Get("nombre")})

@@ -68,6 +68,9 @@ type eslabonEnFoto struct {
 type kvizDePrueba struct {
 	srv     *httptest.Server
 	cliente *fake.Clientset
+	gestor  *conexion.Gestor
+	// sondeo es el doble del pod de sondeo: responde las requests de prueba con lo guionado.
+	sondeo *sondeoDePrueba
 }
 
 // intervaloDePrueba es cada cuánto kviz revisa en los tests si el cluster responde.
@@ -92,11 +95,12 @@ func nuevoKvizConKubeconfig(t *testing.T, kc conexion.Kubeconfig) *kvizDePrueba 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	g := conexion.NuevoGestor(kc, intervaloDePrueba)
+	s := nuevoSondeoDePrueba()
+	g := conexion.NuevoGestor(kc, intervaloDePrueba, s)
 	g.Iniciar(ctx)
 	srv := httptest.NewServer(api.Nuevo(g, nil))
 	t.Cleanup(srv.Close)
-	return &kvizDePrueba{srv: srv}
+	return &kvizDePrueba{srv: srv, gestor: g, sondeo: s}
 }
 
 // nuevoKvizDesdeKubeconfig arranca kviz como el binario: con el contexto actual del kubeconfig

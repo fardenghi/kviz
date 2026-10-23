@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"kviz/internal/foto"
+	"kviz/internal/sondeo"
 )
 
 // Kubeconfig es de dónde salen los contextos y sus clientes. En producción es el kubeconfig de
@@ -41,6 +42,8 @@ type Gestor struct {
 	kubeconfig Kubeconfig
 	intervalo  time.Duration
 	avisos     avisos
+	// ejecutor corre los pedidos adentro del pod de sondeo de cada cluster.
+	ejecutor sondeo.Ejecutor
 
 	mu  sync.Mutex
 	ctx context.Context
@@ -50,12 +53,44 @@ type Gestor struct {
 	contexto string
 	conexion *Conexion // sincronizada; nil mientras no hay conexión
 	motivo   string
+	// sondeo es el pod de sondeo del cluster conectado; nil mientras no hay conexión.
+	sondeo *sondeo.Sondeo
 }
 
 // NuevoGestor arma el gestor; revisa el cluster cada intervalo (IntervaloDeVigilancia en producción).
-func NuevoGestor(kc Kubeconfig, intervalo time.Duration) *Gestor {
-	return &Gestor{kubeconfig: kc, intervalo: intervalo}
+// El ejecutor corre las requests de prueba adentro del pod de sondeo (sondeo.EjecutorPorExec en
+// producción).
+func NuevoGestor(kc Kubeconfig, intervalo time.Duration, ejecutor sondeo.Ejecutor) *Gestor {
+	return &Gestor{kubeconfig: kc, intervalo: intervalo, ejecutor: ejecutor}
 }
+
+// ErrDesconectado es el error de pedir el pod de sondeo mientras kviz no ve el cluster.
+var ErrDesconectado = errors.New("kviz no está conectado al cluster")
+
+// Sondeo es el pod de sondeo del cluster conectado (se crea recién con la primera request de prueba).
+func (g *Gestor) Sondeo() (*sondeo.Sondeo, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.sondeo == nil {
+		return nil, ErrDesconectado
+	}
+	return g.sondeo, nil
+}
+
+// Cerrar borra el pod de sondeo del cluster conectado, si kviz creó o adoptó uno. Se llama al cerrar kviz.
+func (g *Gestor) Cerrar(ctx context.Context) error {
+	g.mu.Lock()
+	s := g.sondeo
+	g.sondeo = nil
+	g.mu.Unlock()
+	if s == nil {
+		return nil
+	}
+	return s.Borrar(ctx)
+}
+
+// esperaBorrado es cuánto se espera a que el cluster que se deja borre el pod de sondeo.
+const esperaBorrado = 10 * time.Second
 
 // Iniciar se conecta al contexto actual de kubectl, en segundo plano, hasta que se cancela ctx.
 // Sin contexto, espera a que kubectl tenga uno. No bloquea.
@@ -126,7 +161,15 @@ func (g *Gestor) empezar(contexto, motivo string) {
 	sesion := g.sesion
 	ctx, parar := context.WithCancel(g.ctx)
 	g.parar = parar
-	g.contexto, g.conexion = contexto, nil
+	// al dejar un cluster por otro se borra su pod de sondeo, sin demorar el cambio
+	if anterior := g.sondeo; anterior != nil {
+		go func() {
+			ctx, cancelar := context.WithTimeout(context.Background(), esperaBorrado)
+			defer cancelar()
+			_ = anterior.Borrar(ctx)
+		}()
+	}
+	g.contexto, g.conexion, g.sondeo = contexto, nil, nil
 	switch {
 	case motivo != "":
 		g.motivo = motivo
@@ -189,10 +232,15 @@ func (g *Gestor) mantener(ctx context.Context, sesion int, contexto string, clie
 			if err != nil {
 				return
 			}
-			g.estado(sesion, func() { g.conexion, g.motivo = c, "" })
+			// un pod de sondeo que dejó una sesión anterior se reutiliza o se borra; si falla, el
+			// pod de sondeo se crea igual cuando haga falta
+			s := sondeo.Nuevo(cliente, contexto, g.ejecutor)
+			_ = s.Adoptar(ctx)
+			g.estado(sesion, func() { g.conexion, g.motivo, g.sondeo = c, "", s })
 		case <-revisar.C:
 			if _, err := g.responde(ctx, contexto); err != nil {
-				g.estado(sesion, func() { g.conexion, g.motivo = nil, noResponde(contexto, err) })
+				// el pod de sondeo queda en el cluster; al reconectarse se adopta
+				g.estado(sesion, func() { g.conexion, g.motivo, g.sondeo = nil, noResponde(contexto, err), nil })
 				return
 			}
 		}

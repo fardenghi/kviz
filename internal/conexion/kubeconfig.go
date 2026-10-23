@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -29,6 +30,16 @@ func (kubeconfigDeKubectl) Contextos() (string, []string, error) {
 }
 
 func (kubeconfigDeKubectl) Cliente(contexto string) (kubernetes.Interface, error) {
+	cfg, err := ConfigDeKubectl(contexto)
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(cfg)
+}
+
+// ConfigDeKubectl es la configuración de la API del cluster de un contexto del kubeconfig de
+// kubectl (la usa el pod de sondeo para hacer exec, como kubectl exec).
+func ConfigDeKubectl(contexto string) (*rest.Config, error) {
 	crudo, err := clientcmd.NewDefaultClientConfigLoadingRules().Load()
 	if err != nil {
 		return nil, fmt.Errorf("no se pudo leer el kubeconfig: %w", err)
@@ -36,9 +47,9 @@ func (kubeconfigDeKubectl) Cliente(contexto string) (kubernetes.Interface, error
 	if _, ok := crudo.Contexts[contexto]; !ok {
 		return nil, fmt.Errorf("%w: %q (¿se borró el cluster?)", ErrContextoInexistente, contexto)
 	}
-	rest, err := clientcmd.NewNonInteractiveClientConfig(*crudo, contexto, &clientcmd.ConfigOverrides{}, nil).ClientConfig()
+	cfg, err := clientcmd.NewNonInteractiveClientConfig(*crudo, contexto, &clientcmd.ConfigOverrides{}, nil).ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("el contexto %q no sirve: %w", contexto, err)
 	}
-	return kubernetes.NewForConfig(rest)
+	return cfg, nil
 }
