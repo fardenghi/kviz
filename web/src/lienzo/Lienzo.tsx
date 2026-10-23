@@ -166,11 +166,23 @@ function Conexion({ conexion: c }: { conexion: ConexionEnEscena }) {
   );
 }
 
+// marca roja de las advertencias de configuración: un punto con "!" y los títulos al pasar el mouse
+function MarcaDeAdvertencia({ x, y, titulos }: { x: number; y: number; titulos: string[] }) {
+  if (titulos.length === 0) return null;
+  return (
+    <g className="advertencia">
+      <circle cx={x} cy={y} r={8} className="advertencia-punto" />
+      <text x={x} y={y + 3.5} className="advertencia-texto">!</text>
+      <title>{titulos.join('\n')}</title>
+    </g>
+  );
+}
+
 function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apuntar: Apuntar }) {
   const puertos = s.puertos.join(', ');
   return (
     <g className="objeto" opacity={s.opacidad} {...apuntar}>
-      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className={clases('service', s.resaltado && 'resaltado', s.pasos.length > 0 && 'en-recorrido')} />
+      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className={clases('service', s.advertencias.length > 0 && 'con-advertencia', s.resaltado && 'resaltado', s.pasos.length > 0 && 'en-recorrido')} />
       <text x={s.x + 20} y={s.y + 20} className="pod-nombre">
         {recortar(s.nombre, s.ancho - 12 - 6.2 * (s.tipo.length + 1))} <tspan className="tipo">{s.tipo}</tspan>
         <title>{`Service ${s.nombre} · namespace ${s.namespace}`}</title>
@@ -181,6 +193,7 @@ function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apu
         <title>{puertos}</title>
       </text>
       <Pasos x={s.x + 14} y={s.y} pasos={s.pasos} />
+      <MarcaDeAdvertencia x={s.x + s.ancho - 14} y={s.y + 2} titulos={s.advertencias} />
     </g>
   );
 }
@@ -188,7 +201,7 @@ function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apu
 function TarjetaIngress({ ingress: i, apuntar }: { ingress: IngressEnEscena; apuntar: Apuntar }) {
   return (
     <g className="objeto" opacity={i.opacidad} {...apuntar}>
-      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className={clases('ingress', i.resaltado && 'resaltado', i.pasos.length > 0 && 'en-recorrido')} />
+      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className={clases('ingress', i.advertencias.length > 0 && 'con-advertencia', i.resaltado && 'resaltado', i.pasos.length > 0 && 'en-recorrido')} />
       <text x={i.x + 12} y={i.y + 22} className="pod-nombre">
         {recortar(i.nombre, i.ancho - 6.2 * (i.clase.length + 10))} <tspan className="tipo">Ingress · {i.clase}</tspan>
         <title>{`Ingress ${i.nombre} · namespace ${i.namespace}`}</title>
@@ -200,6 +213,7 @@ function TarjetaIngress({ ingress: i, apuntar }: { ingress: IngressEnEscena; apu
         </text>
       ))}
       <Pasos x={i.x} y={i.y} pasos={i.pasos} />
+      <MarcaDeAdvertencia x={i.x + i.ancho} y={i.y} titulos={i.advertencias} />
     </g>
   );
 }
@@ -303,6 +317,7 @@ function TarjetaPod({ pod: p, apuntar }: { pod: PodEnEscena; apuntar: Apuntar })
         <Reinicios key={p.reinicios} x={p.x + p.ancho - 8} y={p.y + 52} n={p.reinicios} titila={p.reiniciosTitilan} />
       )}
       <Pasos x={p.x} y={p.y} pasos={p.pasos} />
+      <MarcaDeAdvertencia x={p.x + p.ancho} y={p.y} titulos={p.advertencias} />
     </g>
   );
 }

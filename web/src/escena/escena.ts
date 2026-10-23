@@ -6,6 +6,7 @@ import { type MarcasPod, marcasDePod } from './marcas-pod';
 import { aplicarFoco } from './foco';
 import { aplicarRecorrido } from './recorrido';
 import type { Recorrido } from '../prueba';
+import { advertenciasPorObjeto, titulosDe } from './advertencias';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
 export interface EstadoInterfaz {
@@ -70,7 +71,13 @@ export interface RegionEnEscena extends Caja {
   subtitulo: string;
 }
 
-export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcasDeRecorrido {
+/** Marca roja de las advertencias de configuración de un objeto (ver advertencias.ts). */
+export interface MarcaDeAdvertencia {
+  /** Títulos de sus advertencias, en el orden de la foto; vacío si no tiene (sin marca). */
+  advertencias: string[];
+}
+
+export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcaDeAdvertencia, MarcasDeRecorrido {
   /** `pod:<namespace>/<nombre>`: único en todo el cluster. */
   id: string;
   nombre: string;
@@ -90,7 +97,7 @@ export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcasDeReco
   opacidad: number;
 }
 
-export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcasDeRecorrido {
+export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia, MarcasDeRecorrido {
   /** `service:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -101,7 +108,7 @@ export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcasDeRecorrido {
   puertos: string[];
 }
 
-export interface IngressEnEscena extends Caja, MarcasDeFoco, MarcasDeRecorrido {
+export interface IngressEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia, MarcasDeRecorrido {
   /** `ingress:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -230,7 +237,7 @@ const pasaElInterruptor = (ns: string, estado: EstadoInterfaz) =>
   ns !== NAMESPACE_DE_KVIZ && (!!estado.mostrarSistema || !esNamespaceDelSistema(ns));
 
 /** Un namespace se ve si pasa el interruptor del sistema y el filtro por namespace. */
-const seVe = (ns: string, estado: EstadoInterfaz) =>
+export const seVe =(ns: string, estado: EstadoInterfaz) =>
   pasaElInterruptor(ns, estado) && (!estado.namespace || ns === estado.namespace);
 
 /** Opacidad de un pod Terminating: se ve atenuado hasta que desaparece de la foto. */
@@ -259,6 +266,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const regiones: RegionEnEscena[] = [];
   const pods: PodEnEscena[] = [];
 
+  const advertencias = advertenciasPorObjeto(foto);
   const delRecorrido = new Set(estado.podsDelRecorrido);
   const workloads = indiceDeWorkloads(foto);
   const seleccionado = estado.workloadSeleccionado ? workloads.get(estado.workloadSeleccionado) : undefined;
@@ -308,6 +316,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         ...terminando(p, seleccionDeWorkload(p, seleccionado)),
         workload: marcaDeWorkload(p, workloads),
         ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
+        advertencias: titulosDe(advertencias, idPod(p)),
         ...tarjeta,
       });
     });
@@ -370,6 +379,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
       pasos: [],
     })),
   );
+
+  for (const o of [...services, ...ingress]) o.advertencias = titulosDe(advertencias, o.id);
 
   const conexiones = [
     ...conexionesIngressService(ingressVisibles, ingress, services),
@@ -451,6 +462,7 @@ function ubicarIngress(visibles: Ingress[], services: ServiceEnEscena[], finEsce
       resaltado: false,
       opacidad: 1,
       pasos: [],
+      advertencias: [],
     });
   };
 
@@ -548,6 +560,7 @@ function ubicarServices(visibles: Service[], pods: PodEnEscena[], finRegiones: n
       resaltado: false,
       opacidad: 1,
       pasos: [],
+      advertencias: [],
     });
   };
 

@@ -64,9 +64,6 @@ func NuevoGestor(kc Kubeconfig, intervalo time.Duration, ejecutor sondeo.Ejecuto
 	return &Gestor{kubeconfig: kc, intervalo: intervalo, ejecutor: ejecutor}
 }
 
-// ErrDesconectado es el error de pedir el pod de sondeo mientras kviz no ve el cluster.
-var ErrDesconectado = errors.New("kviz no está conectado al cluster")
-
 // Sondeo es el pod de sondeo del cluster conectado (se crea recién con la primera request de prueba).
 func (g *Gestor) Sondeo() (*sondeo.Sondeo, error) {
 	g.mu.Lock()

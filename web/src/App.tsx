@@ -8,6 +8,8 @@ import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
 import { FormularioDePrueba } from './superficies/FormularioDePrueba';
 import { TarjetaDelRecorrido } from './superficies/TarjetaDelRecorrido';
 import type { Prueba } from './prueba';
+import { FranjaDeEvents } from './superficies/FranjaDeEvents';
+import { eventsDeLaFranja } from './events';
 import { EN_VIVO_INICIAL, type EnVivo, finDelBrillo, podsNuevos, recibir } from './tiempoReal';
 
 export function App() {
@@ -78,6 +80,11 @@ export function App() {
   const filtro = namespace !== null && namespaces.includes(namespace) ? namespace : null;
   const workloads = useMemo(
     () => (foto ? workloadsVisibles(foto, { mostrarSistema, namespace: filtro }) : []),
+    [foto, mostrarSistema, filtro],
+  );
+  // la franja de events respeta los mismos filtros de namespace que la vista
+  const events = useMemo(
+    () => (foto ? eventsDeLaFranja(foto, { mostrarSistema, namespace: filtro }) : []),
     [foto, mostrarSistema, filtro],
   );
   // si el workload seleccionado se borra o queda oculto por los filtros, se deselecciona
@@ -200,6 +207,7 @@ export function App() {
           )}
         </Lienzo>
       )}
+      {escena && <FranjaDeEvents events={events} abrir={abrir} />}
     </div>
   );
 }

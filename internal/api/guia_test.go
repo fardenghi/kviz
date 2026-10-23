@@ -20,8 +20,8 @@ func clusterDeLaGuia() []runtime.Object {
 		nodo("lab-control-plane", "172.23.0.2"),
 		nodo("lab-worker", "172.23.0.4"),
 		nodo("lab-worker2", "172.23.0.3"),
-		pod("default", "backend-79f9ffc666-k2x8p", "lab-worker", "10.244.1.5", corev1.PodRunning),
-		pod("default", "backend-79f9ffc666-7hw4q", "lab-worker2", "10.244.2.4", corev1.PodRunning),
+		podDeBackend("backend-79f9ffc666-k2x8p", "lab-worker", "10.244.1.5"),
+		podDeBackend("backend-79f9ffc666-7hw4q", "lab-worker2", "10.244.2.4"),
 		service("default", "backend", corev1.ServiceTypeNodePort, "10.96.11.121", map[string]string{"app": "backend"},
 			corev1.ServicePort{Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: intstr.FromInt32(8081), NodePort: 30010}),
 		endpointSlice("default", "backend-x7k2p", "backend",
@@ -31,6 +31,18 @@ func clusterDeLaGuia() []runtime.Object {
 		ingressDeLaGuia(),
 	}
 	return append(objetos, ingressController()...)
+}
+
+// podDeBackend es un pod del Deployment backend (6b-deployment.yaml): label app=backend y el
+// container application con la imagen local lab-backend:latest (IfNotPresent) en el puerto 8081.
+func podDeBackend(nombre, nodo, ip string) *corev1.Pod {
+	p := pod("default", nombre, nodo, ip, corev1.PodRunning)
+	p.Labels = map[string]string{"app": "backend"}
+	p.Spec.Containers = []corev1.Container{{
+		Name: "application", Image: "lab-backend:latest", ImagePullPolicy: corev1.PullIfNotPresent,
+		Ports: []corev1.ContainerPort{{ContainerPort: 8081, Protocol: corev1.ProtocolTCP}},
+	}}
+	return p
 }
 
 // ingressDeLaGuia es 7d-ingress.yaml.

@@ -90,3 +90,17 @@ export async function mandarPrueba(pedido: PedidoDePrueba): Promise<Prueba> {
   if (!res.ok) throw new Error((await res.text()).trim() || `POST /api/pruebas respondió ${res.status}`);
   return res.json();
 }
+
+/**
+ * Revela el valor de una clave de un Secret (POST /api/secreto). Es el único camino por el que
+ * un valor de Secret sale del backend: la foto trae solo las claves.
+ */
+export async function revelarSecret(o: { namespace: string; nombre: string; clave: string }): Promise<string> {
+  const res = await fetch('/api/secreto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(o),
+  });
+  if (!res.ok) throw new Error((await res.text()).trim() || `POST /api/secreto respondió ${res.status}`);
+  return ((await res.json()) as { valor: string }).valor;
+}

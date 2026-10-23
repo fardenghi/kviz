@@ -43,11 +43,12 @@ sirve una página que explica cómo compilarla.
 |---|---|
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
 | `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster) |
-| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle |
+| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle; `env.go`: origen de env; `configmaps.go`: ConfigMaps y Secrets (solo claves); `volumenes.go`: volúmenes y montajes |
+| `internal/advertencias/` | 6 · advertencias de configuración: las seis reglas de las historias 70–75, puras sobre la foto (y los objetos de los que sale), con explicación y comando sugerido; viajan en `foto.advertencias` |
 | `internal/sondeo/` | 10 · pod de sondeo: ciclo de vida en `kviz-system` (`sondeo.go`: se crea con la primera request, huérfanos al conectarse, se borra al cerrar o al cambiar de contexto) y `Ejecutor`, la interfaz "ejecutar y devolver el resultado crudo" (`exec.go`: curl por exec; en los tests, `sondeoDePrueba`) |
 | `internal/trafico/` | 11 · depuración de tráfico, puro: URL del destino, recorrido desde la foto (`Recorrer`) y pod que respondió (`PodQueRespondio`, `ConRespuesta`) |
 | `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto) |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/pruebas` en `pruebas.go`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
+| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/secreto` en `secreto.go`, `POST /api/pruebas` en `pruebas.go`), canal de streaming (`GET /api/stream`, `stream.go`), logs de un container (`GET /api/logs`, `logs.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
@@ -56,7 +57,8 @@ sirve una página que explica cómo compilarla.
 | `web/src/prueba.ts` | espejo TypeScript de la request de prueba y su recorrido (`POST /api/pruebas`) |
 | `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
-| `web/src/superficies/` | superficies flotantes (lista de workloads, formulario de request de prueba, tarjeta del recorrido, …) |
+| `web/src/superficies/` | superficies flotantes (lista de workloads, franja de events, formulario de request de prueba, tarjeta del recorrido, …) |
+| `web/src/events.ts` | events del cluster (`internal/foto/events.go`): los de la franja (con los filtros de namespace), el objeto que selecciona un clic y los events de un objeto para el panel |
 | `web/src/detalle/` | panel de detalle (cajón a la derecha): `detalle.ts` qué objeto muestra; una sección por archivo en `secciones/` (ver `secciones.ts`); `Comando.tsx` comando sugerido con botón de copiar |
 | `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
 
@@ -72,6 +74,19 @@ cambiaron sin código nuevo.
 `tipo`: primero `{"tipo":"foto","foto":{…}}` con la foto completa y después
 `{"tipo":"cambios","cambios":[…]}` con lo que cambió (ver `foto.Cambio`). El canal admite más tipos
 de mensaje; el escritor de SSE (`sse` en `stream.go`) sirve también para otras rutas.
+
+`GET /api/logs?namespace=…&pod=…&container=…[&anterior=true]` usa el mismo escritor: manda las
+últimas 1000 líneas del container (`{"tipo":"lineas","lineas":[…]}`) y sigue en vivo; los del
+reinicio anterior (`anterior=true`, `kubectl logs --previous`) terminan con `{"tipo":"fin"}`. Si
+Kubernetes no da los logs llega `{"tipo":"error","error":"…"}`. Cerrar la conexión corta el pedido
+al cluster. Un pod o container que no está en la foto, o `anterior` sin reinicios, dan 404.
+
+## Secrets
+
+La foto y el stream traen los Secrets solo con sus claves, y una variable de entorno que sale de un
+Secret viaja sin valor. El único camino por el que un valor sale de kviz es `POST /api/secreto` con
+`{"namespace", "nombre", "clave"}` → `{"valor"}` (404 si no existe), que el panel de detalle usa al
+tocar "Revelar".
 
 ## Contexto y reconexión
 

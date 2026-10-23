@@ -25,6 +25,7 @@ import (
 	listersnetworkingv1 "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 
+	"kviz/internal/advertencias"
 	"kviz/internal/foto"
 )
 
@@ -46,6 +47,10 @@ type Conexion struct {
 	services     listerscorev1.ServiceLister
 	slices       listersdiscoveryv1.EndpointSliceLister
 	ingress      listersnetworkingv1.IngressLister
+	clases       listersnetworkingv1.IngressClassLister
+	configMaps   listerscorev1.ConfigMapLister
+	secrets      listerscorev1.SecretLister
+	events       listerscorev1.EventLister
 }
 
 // nueva arma una conexión sobre un cliente ya creado; los cambios de sus objetos avisan a a.
@@ -71,6 +76,12 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	c.slices = slices.Lister()
 	ingress := fabrica.Networking().V1().Ingresses()
 	c.ingress = ingress.Lister()
+	clases := fabrica.Networking().V1().IngressClasses()
+	c.clases = clases.Lister()
+	configMaps, secrets := fabrica.Core().V1().ConfigMaps(), fabrica.Core().V1().Secrets()
+	c.configMaps, c.secrets = configMaps.Lister(), secrets.Lister()
+	events := fabrica.Core().V1().Events()
+	c.events = events.Lister()
 	apps, batch := fabrica.Apps().V1(), fabrica.Batch().V1()
 	c.deployments = apps.Deployments().Lister()
 	c.replicaSets = apps.ReplicaSets().Lister()
@@ -84,6 +95,9 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 		nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(), ingress.Informer(),
 		apps.Deployments().Informer(), apps.ReplicaSets().Informer(), apps.StatefulSets().Informer(),
 		apps.DaemonSets().Informer(), batch.Jobs().Informer(), batch.CronJobs().Informer(),
+		clases.Informer(),
+		configMaps.Informer(), secrets.Informer(),
+		events.Informer(),
 	} {
 		if _, err := inf.AddEventHandler(c.avisos.alCambiar()); err != nil {
 			return err
@@ -119,6 +133,13 @@ func (c *Conexion) Objetos() foto.Objetos {
 	o.DaemonSets, _ = c.daemonSets.List(labels.Everything())
 	o.Jobs, _ = c.jobs.List(labels.Everything())
 	o.CronJobs, _ = c.cronJobs.List(labels.Everything())
+	o.IngressClasses, _ = c.clases.List(labels.Everything())
+	o.ConfigMaps, _ = c.configMaps.List(labels.Everything())
+	o.Secrets, _ = c.secrets.List(labels.Everything())
+	events, _ := c.events.List(labels.Everything())
+	for _, e := range events {
+		o.Events = append(o.Events, *e)
+	}
 	return o
 }
 
@@ -127,5 +148,8 @@ func (c *Conexion) Foto() foto.Foto {
 	if !c.sincronizada.Load() {
 		return foto.Desconectada(c.contexto, conectando(c.contexto))
 	}
-	return foto.Construir(c.contexto, c.Objetos())
+	o := c.Objetos()
+	f := foto.Construir(c.contexto, o)
+	f.Advertencias = advertencias.De(f, o)
+	return f
 }
