@@ -17,6 +17,7 @@ type hostPortEnFoto struct {
 }
 
 type puertaEnFoto struct {
+	ID          string  `json:"id"`
 	Nodo        string  `json:"nodo"`
 	Puerto      int32   `json:"puerto"`
 	Protocolo   string  `json:"protocolo"`
@@ -78,7 +79,7 @@ func TestUnServiceNodePortEnUnClusterDeTresNodosAbreTresPuertas(t *testing.T) {
 	got := kviz.fotoConPuertas(t).Puertas
 
 	puerta := func(nodo string) puertaEnFoto {
-		return puertaEnFoto{Nodo: nodo, Puerto: 30010, Protocolo: "TCP", Tipo: "NodePort", Namespace: "default",
+		return puertaEnFoto{ID: nodo + "/30010/TCP", Nodo: nodo, Puerto: 30010, Protocolo: "TCP", Tipo: "NodePort", Namespace: "default",
 			Service: ptr("backend"), HaciaPuerto: 80}
 	}
 	want := []puertaEnFoto{puerta("lab-control-plane"), puerta("lab-worker"), puerta("lab-worker2")}
@@ -99,30 +100,31 @@ func TestUnHostPortAbreUnaSolaPuertaEnElNodoDeSuPod(t *testing.T) {
 		}
 	}
 	puerta := func(puerto int32) puertaEnFoto {
-		return puertaEnFoto{Nodo: "lab-worker2", Puerto: puerto, Protocolo: "TCP", Tipo: "hostPort", Namespace: "ingress-nginx",
+		return puertaEnFoto{ID: "lab-worker2/" + itoa(puerto) + "/TCP", Nodo: "lab-worker2", Puerto: puerto, Protocolo: "TCP", Tipo: "hostPort", Namespace: "ingress-nginx",
 			Pod: ptr("ingress-nginx-controller-6b9f-lx2wp"), HaciaPuerto: puerto}
 	}
-	want := []puertaEnFoto{puerta(80), puerta(443)}
+	// por id: el orden es el del texto, no el numérico (la escena las ordena para dibujarlas)
+	want := []puertaEnFoto{puerta(443), puerta(80)}
 	if !reflect.DeepEqual(hostPorts, want) {
 		t.Fatalf("puertas de hostPort = %s, want %s", mostrar(hostPorts), mostrar(want))
 	}
 }
 
-func TestLasPuertasDeLaGuiaVanPorNodoConLasDeNodePortPrimero(t *testing.T) {
+func TestLasPuertasDeLaGuiaVanOrdenadasPorID(t *testing.T) {
 	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuia()...)
 
 	got := kviz.fotoConPuertas(t).Puertas
 
 	resumen := []string{}
 	for _, p := range got {
-		resumen = append(resumen, p.Nodo+" "+p.Tipo+" "+itoa(p.Puerto))
+		resumen = append(resumen, p.ID+" "+p.Tipo)
 	}
 	want := []string{
-		"lab-control-plane NodePort 30010",
-		"lab-worker NodePort 30010",
-		"lab-worker2 NodePort 30010",
-		"lab-worker2 hostPort 80",
-		"lab-worker2 hostPort 443",
+		"lab-control-plane/30010/TCP NodePort",
+		"lab-worker/30010/TCP NodePort",
+		"lab-worker2/30010/TCP NodePort",
+		"lab-worker2/443/TCP hostPort",
+		"lab-worker2/80/TCP hostPort",
 	}
 	if !reflect.DeepEqual(resumen, want) {
 		t.Fatalf("puertas = %v, want %v", resumen, want)
@@ -150,6 +152,26 @@ func TestUnPodSinNodoOTerminadoNoAbrePuertas(t *testing.T) {
 		if len(p.HostPorts) != 1 {
 			t.Errorf("pod %s: hostPorts = %s, want el de su spec", p.Nombre, mostrar(p.HostPorts))
 		}
+	}
+}
+
+func TestDosPuertasEnElMismoNodoPuertoYProtocoloQuedanEnUna(t *testing.T) {
+	conHostPort := func(p *corev1.Pod) *corev1.Pod {
+		p.Spec.Containers = []corev1.Container{{Name: "web", Ports: []corev1.ContainerPort{{ContainerPort: 8080, HostPort: 30010}}}}
+		return p
+	}
+	kviz := nuevoKviz(t, "kind-lab",
+		nodo("lab-worker", "172.23.0.4"),
+		service("default", "backend", corev1.ServiceTypeNodePort, "10.96.11.121", map[string]string{"app": "backend"},
+			corev1.ServicePort{Protocol: corev1.ProtocolTCP, Port: 80, NodePort: 30010}),
+		conHostPort(pod("default", "web", "lab-worker", "10.244.1.9", corev1.PodRunning)),
+	)
+
+	got := kviz.fotoConPuertas(t).Puertas
+
+	// un id es único en su lista: de un cluster mal armado queda una sola puerta, la NodePort
+	if len(got) != 1 || got[0].ID != "lab-worker/30010/TCP" || got[0].Tipo != "NodePort" {
+		t.Fatalf("puertas = %s, want solo la NodePort lab-worker/30010/TCP", mostrar(got))
 	}
 }
 

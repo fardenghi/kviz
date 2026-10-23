@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest';
 import type { Foto, Pod } from '../foto';
 import { type Caja, construirEscena, namespacesDelFiltro } from './escena';
 
-const nodo = (nombre: string, internalIP: string) => ({ nombre, internalIP });
+const nodo = (nombre: string, internalIP: string) => ({ id: nombre, nombre, internalIP });
 const pod = (nombre: string, nodo: string | null, ip: string | null = '10.244.0.1'): Pod => ({
+  id: `default/${nombre}`,
   nombre,
   namespace: 'default',
   nodo,

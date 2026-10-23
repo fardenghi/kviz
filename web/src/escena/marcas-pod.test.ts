@@ -16,6 +16,7 @@ const container = (nombre: string, parte: Partial<Container> = {}): Container =>
   ...parte,
 });
 const pod = (nombre: string, parte: Partial<Pod> = {}): Pod => ({
+  id: `default/${nombre}`,
   nombre,
   namespace: 'default',
   nodo: 'lab-worker',
@@ -30,7 +31,7 @@ const pod = (nombre: string, parte: Partial<Pod> = {}): Pod => ({
 const foto = (...pods: Pod[]): Foto => ({
   contexto: 'kind-lab',
   conectado: true,
-  nodos: [{ nombre: 'lab-worker', internalIP: '172.23.0.4' }],
+  nodos: [{ id: 'lab-worker', nombre: 'lab-worker', internalIP: '172.23.0.4' }],
   pods,
   services: [],
   workloads: [],
@@ -209,6 +210,7 @@ describe('containers como chips', () => {
       ...foto(pod('backend-79f9ffc666-k2x8p', { containers: [container('application', { puertos: [puerto(8081)] })] })),
       services: [
         {
+          id: 'default/backend',
           nombre: 'backend',
           namespace: 'default',
           tipo: 'NodePort',

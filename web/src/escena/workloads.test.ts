@@ -11,6 +11,7 @@ const DORADO = '#b8860b';
 const GRIS = '#7b8794';
 
 const pod = (namespace: string, nombre: string, nodo: string, workload: string | null = null): Pod => ({
+  id: `${namespace}/${nombre}`,
   nombre,
   namespace,
   nodo,
@@ -46,8 +47,8 @@ const lab = (): Foto => ({
   ingress: [],
   puertas: [],
   nodos: [
-    { nombre: 'lab-worker', internalIP: '172.23.0.4' },
-    { nombre: 'lab-worker2', internalIP: '172.23.0.3' },
+    { id: 'lab-worker', nombre: 'lab-worker', internalIP: '172.23.0.4' },
+    { id: 'lab-worker2', nombre: 'lab-worker2', internalIP: '172.23.0.3' },
   ],
   pods: [
     pod('default', 'backend-6c7d9f8b5-p8r2c', 'lab-worker', BACKEND),

@@ -4,8 +4,9 @@
 // kviz nunca se cae por no poder conectarse: sin contexto, o mientras el cluster no responde,
 // la conexión entrega una foto desconectada con el motivo.
 //
-// Para observar un tipo de objeto nuevo: registrar su informer en Iniciar y copiar sus objetos
-// en Objetos (y sumarlos a foto.Objetos).
+// Para observar un tipo de objeto nuevo: registrar su informer en Iniciar (con el handler de
+// avisos, para que sus cambios lleguen en vivo) y copiar sus objetos en Objetos (y sumarlos a
+// foto.Objetos).
 package conexion
 
 import (
@@ -21,6 +22,7 @@ import (
 	listerscorev1 "k8s.io/client-go/listers/core/v1"
 	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	listersnetworkingv1 "k8s.io/client-go/listers/networking/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"kviz/internal/foto"
@@ -34,6 +36,7 @@ type Conexion struct {
 	motivo  string
 
 	sincronizada atomic.Bool
+	avisos       avisos
 	nodos        listerscorev1.NodeLister
 	pods         listerscorev1.PodLister
 	deployments  listersappsv1.DeploymentLister
@@ -102,7 +105,6 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	c.slices = slices.Lister()
 	ingress := fabrica.Networking().V1().Ingresses()
 	c.ingress = ingress.Lister()
-
 	apps, batch := fabrica.Apps().V1(), fabrica.Batch().V1()
 	c.deployments = apps.Deployments().Lister()
 	c.replicaSets = apps.ReplicaSets().Lister()
@@ -110,6 +112,17 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	c.daemonSets = apps.DaemonSets().Lister()
 	c.jobs = batch.Jobs().Lister()
 	c.cronJobs = batch.CronJobs().Lister()
+
+	// cada alta, modificación o baja de un objeto observado avisa al stream
+	for _, inf := range []cache.SharedIndexInformer{
+		nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(), ingress.Informer(),
+		apps.Deployments().Informer(), apps.ReplicaSets().Informer(), apps.StatefulSets().Informer(),
+		apps.DaemonSets().Informer(), batch.Jobs().Informer(), batch.CronJobs().Informer(),
+	} {
+		if _, err := inf.AddEventHandler(c.avisos.alCambiar()); err != nil {
+			return err
+		}
+	}
 
 	fabrica.Start(ctx.Done())
 	sincronizados := fabrica.WaitForCacheSync(ctx.Done())
@@ -121,6 +134,7 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 		return fmt.Errorf("no se pudo sincronizar con el cluster %q", c.contexto)
 	}
 	c.sincronizada.Store(true)
+	c.avisos.avisar()
 	return nil
 }
 

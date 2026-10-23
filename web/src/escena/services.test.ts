@@ -4,8 +4,9 @@ import type { Endpoint, Foto, Pod, Service } from '../foto';
 import { encuadrar } from '../lienzo/vista';
 import { type Caja, construirEscena } from './escena';
 
-const nodo = (nombre: string) => ({ nombre, internalIP: '172.23.0.2' });
+const nodo = (nombre: string) => ({ id: nombre, nombre, internalIP: '172.23.0.2' });
 const pod = (nombre: string, nodo: string | null): Pod => ({
+  id: `default/${nombre}`,
   nombre,
   namespace: 'default',
   nodo,
@@ -19,6 +20,7 @@ const pod = (nombre: string, nodo: string | null): Pod => ({
 const listo = (pod: string): Endpoint => ({ ip: '10.244.0.1', pod, nodo: null, listo: true });
 const noListo = (pod: string): Endpoint => ({ ip: '10.244.0.1', pod, nodo: null, listo: false });
 const service = (nombre: string, endpoints: Endpoint[] = [], parte: Partial<Service> = {}): Service => ({
+  id: `default/${nombre}`,
   nombre,
   namespace: 'default',
   tipo: 'ClusterIP',

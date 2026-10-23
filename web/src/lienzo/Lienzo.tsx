@@ -10,6 +10,7 @@ import type {
   RegionEnEscena,
   ServiceEnEscena,
 } from '../escena/escena';
+import { BRILLO_POD_NUEVO } from '../tiempoReal';
 import { encuadrar, type Vista, zoomEn } from './vista';
 
 export function Lienzo({
@@ -190,6 +191,9 @@ const recortar = (texto: string, ancho: number) => {
   return texto.length > max ? texto.slice(0, max - 1) + '…' : texto;
 };
 
+// un pod nuevo brilla BRILLO_POD_NUEVO.veces y para; uno Terminating queda punteado (la escena lo atenúa)
+const brillo = { animation: `brillo ${BRILLO_POD_NUEVO.msPorVez}ms ease-in-out ${BRILLO_POD_NUEVO.veces}` };
+
 // la etiqueta del workload va a la derecha, en la línea de la IP, cortada con el espacio que deja
 // la IP (aprox. 6.4 px por letra de la IP en mono y 5.6 px por letra de la etiqueta)
 const recortarEtiqueta = (texto: string, ip: string, ancho: number) => {
@@ -201,7 +205,7 @@ function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
   // el lienzo no recorta el SVG: la barra se dibuja adentro de la tarjeta con su propio clip
   const clip = `clip-${p.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   return (
-    <g opacity={p.opacidad} className="objeto">
+    <g opacity={p.opacidad} className={p.terminando ? 'objeto pod-terminando' : 'objeto'}>
       <clipPath id={clip}>
         <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={8} />
       </clipPath>
@@ -211,8 +215,11 @@ function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
         width={p.ancho}
         height={p.alto}
         rx={8}
-        className={p.tonoEstado === 'mal' ? 'pod pod-mal' : 'pod'}
-        style={p.bordeWorkload ? { stroke: p.bordeWorkload, strokeWidth: 2.5 } : undefined}
+        className={['pod', p.tonoEstado === 'mal' && 'pod-mal', p.nuevo && 'pod-nuevo'].filter(Boolean).join(' ')}
+        style={{
+          ...(p.bordeWorkload ? { stroke: p.bordeWorkload, strokeWidth: 2.5 } : {}),
+          ...(p.nuevo ? brillo : {}),
+        }}
       />
       <rect x={p.x} y={p.y} width={4} height={p.alto} fill={p.workload.color} clipPath={`url(#${clip})`} />
       <text x={p.x + 13} y={p.y + 18} className="pod-nombre">

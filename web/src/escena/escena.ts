@@ -17,6 +17,8 @@ export interface EstadoInterfaz {
    * filtros los oculten, como el pod del Ingress Controller. Lo completa el recorrido (ticket 17).
    */
   podsDelRecorrido?: string[];
+  /** ids de escena de los pods que acaban de aparecer y tienen que brillar (ver tiempoReal.ts). */
+  podsNuevos?: ReadonlySet<string>;
   /** id del workload seleccionado en la lista de workloads. No es foco: solo resalta sus pods. */
   workloadSeleccionado?: string | null;
 }
@@ -44,11 +46,15 @@ export interface PodEnEscena extends Caja, MarcasPod {
   ip: string | null;
   /** id de la región que lo contiene. */
   region: string;
+  /** Acaba de aparecer: brilla 3 veces. */
+  nuevo: boolean;
+  /** Se está borrando (`Terminating`): se ve atenuado (ver opacidad) y punteado hasta que desaparece. */
+  terminando: boolean;
   /** Barra y etiqueta corta de su workload, en su color. */
   workload: MarcaDeWorkload;
   /** Con un workload seleccionado, el color del borde de sus pods; si no, null. */
   bordeWorkload: string | null;
-  /** 1, o atenuado cuando hay un workload seleccionado y el pod no es suyo. */
+  /** 1, o atenuado cuando hay un workload seleccionado y el pod no es suyo, o si es Terminating. */
   opacidad: number;
 }
 
@@ -183,6 +189,15 @@ const pasaElInterruptor = (ns: string, estado: EstadoInterfaz) =>
 const seVe = (ns: string, estado: EstadoInterfaz) =>
   pasaElInterruptor(ns, estado) && (!estado.namespace || ns === estado.namespace);
 
+/** Opacidad de un pod Terminating: se ve atenuado hasta que desaparece de la foto. */
+export const OPACIDAD_TERMINANDO = 0.4;
+
+/** Un pod Terminating queda atenuado, y más si además lo atenúa la selección de un workload. */
+function terminando<T extends { opacidad: number }>(p: Pod, marcas: T): T & { terminando: boolean } {
+  const terminando = p.estado === 'Terminating';
+  return { ...marcas, terminando, opacidad: terminando ? Math.min(marcas.opacidad, OPACIDAD_TERMINANDO) : marcas.opacidad };
+}
+
 /** Namespaces que ofrece el filtro: los que tienen pods, sin los del sistema mientras están ocultos. */
 export function namespacesDelFiltro(foto: Foto, estado: EstadoInterfaz = {}): string[] {
   const nombres = new Set(foto.pods.map((p) => p.namespace).filter((ns) => pasaElInterruptor(ns, estado)));
@@ -243,8 +258,9 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         namespace: p.namespace,
         ip: p.ip,
         region: g.id,
+        nuevo: estado.podsNuevos?.has(idPod(p)) ?? false,
+        ...terminando(p, seleccionDeWorkload(p, seleccionado)),
         workload: marcaDeWorkload(p, workloads),
-        ...seleccionDeWorkload(p, seleccionado),
         ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
         ...tarjeta,
       });
@@ -271,9 +287,10 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
     for (const s of services) s.y += bajar;
   }
 
-  // las puertas de cada nodo, de derecha a izquierda; si no entran en una fila, suben a otra
+  // las puertas de cada nodo, de derecha a izquierda (NodePort primero, después por número); si no
+  // entran en una fila, suben a otra. La foto las trae por id, que no es el orden numérico.
   const puertasPorNodo = new Map<string, Puerta[]>();
-  for (const p of foto.puertas.filter((p) => seVePuerta(p, estado, delRecorrido))) {
+  for (const p of foto.puertas.filter((p) => seVePuerta(p, estado, delRecorrido)).sort(ordenPuertas)) {
     puertasPorNodo.set(p.nodo, [...(puertasPorNodo.get(p.nodo) ?? []), p]);
   }
   const porFila = Math.max(1, Math.floor((anchoRegion - M.margenPuerta - M.anchoPuerta) / M.pasoPuerta) + 1);
@@ -315,6 +332,11 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const alto = Math.max(0, ...cajas.map((c) => c.y + c.alto));
   return { ancho, alto, regiones, pods, services, ingress, puertas, conexiones };
 }
+
+const ordenPuertas = (a: Puerta, b: Puerta) =>
+  Number(b.tipo === 'NodePort') - Number(a.tipo === 'NodePort') ||
+  a.puerto - b.puerto ||
+  (a.protocolo < b.protocolo ? -1 : a.protocolo > b.protocolo ? 1 : 0);
 
 export const idPuerta = (p: Pick<Puerta, 'nodo' | 'puerto' | 'protocolo'>) =>
   `puerta:${p.nodo}/${p.puerto}` + (p.protocolo !== 'TCP' ? `/${p.protocolo}` : '');

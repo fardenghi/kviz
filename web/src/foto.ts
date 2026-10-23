@@ -1,5 +1,6 @@
-// Contrato de la foto del cluster, tal como la entrega GET /api/foto.
+// Contrato de la foto del cluster, tal como la entrega GET /api/foto y el stream (ver tiempoReal.ts).
 // Es el espejo de internal/foto/foto.go: si se agrega un campo allá, se agrega acá.
+// Cada objeto de una lista lleva un `id` único en su lista, y las listas van ordenadas por id.
 
 export interface Foto {
   /** Contexto de kubectl de kviz, por ejemplo "kind-lab"; "" si kubectl no tiene contexto. */
@@ -8,26 +9,30 @@ export interface Foto {
   conectado: boolean;
   /** Por qué kviz está desconectado, en español. */
   motivo?: string;
-  /** Ordenados por nombre. */
+  /** Ordenados por id (el nombre). */
   nodos: Nodo[];
-  /** Ordenados por namespace y nombre. */
+  /** Ordenados por id (namespace y nombre). */
   pods: Pod[];
-  /** Workloads de arriba de cada cadena de dueños, ordenados por namespace y nombre. */
+  /** Workloads de arriba de cada cadena de dueños, ordenados por id. */
   workloads: Workload[];
-  /** Ordenados por namespace y nombre. */
+  /** Ordenados por id (namespace y nombre). */
   services: Service[];
-  /** Ordenados por namespace y nombre. */
+  /** Ordenados por id (namespace y nombre). */
   ingress: Ingress[];
-  /** Ordenadas por nodo, con las NodePort primero, y por puerto. */
+  /** Ordenadas por id (nodo, puerto y protocolo: el orden del texto, no el numérico). */
   puertas: Puerta[];
 }
 
 export interface Nodo {
+  /** El nombre del nodo. */
+  id: string;
   nombre: string;
   internalIP: string;
 }
 
 export interface Pod {
+  /** `<namespace>/<nombre>`. */
+  id: string;
   nombre: string;
   namespace: string;
   /** null cuando el scheduler todavía no le asignó un nodo. */
@@ -106,6 +111,8 @@ export interface HostPort {
 }
 
 export interface Service {
+  /** `<namespace>/<nombre>`. */
+  id: string;
   nombre: string;
   namespace: string;
   /** spec.type: ClusterIP, NodePort, LoadBalancer o ExternalName. */
@@ -138,6 +145,8 @@ export interface Endpoint {
 }
 
 export interface Ingress {
+  /** `<namespace>/<nombre>`. */
+  id: string;
   nombre: string;
   namespace: string;
   /** spec.ingressClassName (o la anotación vieja kubernetes.io/ingress.class); null si no tiene. */
@@ -165,6 +174,8 @@ export interface ReglaIngress {
  * (una puerta solo en el nodo de su pod).
  */
 export interface Puerta {
+  /** `<nodo>/<puerto>/<protocolo>`: en un nodo, un puerto y protocolo abre una sola puerta. */
+  id: string;
   nodo: string;
   puerto: number;
   protocolo: string;

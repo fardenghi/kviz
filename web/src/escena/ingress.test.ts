@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { Endpoint, Foto, Ingress, Pod, Puerta, Service } from '../foto';
 import { type Caja, construirEscena } from './escena';
 
-const nodo = (nombre: string) => ({ nombre, internalIP: '172.23.0.2' });
+const nodo = (nombre: string) => ({ id: nombre, nombre, internalIP: '172.23.0.2' });
 const pod = (nombre: string, nodo: string | null, namespace = 'default'): Pod => ({
+  id: `${namespace}/${nombre}`,
   nombre,
   namespace,
   nodo,
@@ -17,6 +18,7 @@ const pod = (nombre: string, nodo: string | null, namespace = 'default'): Pod =>
 });
 const listo = (pod: string): Endpoint => ({ ip: '10.244.0.1', pod, nodo: null, listo: true });
 const service = (nombre: string, endpoints: Endpoint[] = [], parte: Partial<Service> = {}): Service => ({
+  id: `${parte.namespace ?? 'default'}/${nombre}`,
   nombre,
   namespace: 'default',
   tipo: 'ClusterIP',
@@ -27,6 +29,7 @@ const service = (nombre: string, endpoints: Endpoint[] = [], parte: Partial<Serv
   ...parte,
 });
 const ingress = (nombre: string, services: string[], parte: Partial<Ingress> = {}): Ingress => ({
+  id: `${parte.namespace ?? 'default'}/${nombre}`,
   nombre,
   namespace: 'default',
   clase: 'nginx',
@@ -35,6 +38,7 @@ const ingress = (nombre: string, services: string[], parte: Partial<Ingress> = {
   ...parte,
 });
 const nodePort = (nodo: string, puerto: number, service: string, namespace = 'default'): Puerta => ({
+  id: `${nodo}/${puerto}/TCP`,
   nodo,
   puerto,
   protocolo: 'TCP',
@@ -45,6 +49,7 @@ const nodePort = (nodo: string, puerto: number, service: string, namespace = 'de
   haciaPuerto: 80,
 });
 const hostPort = (nodo: string, puerto: number, pod: string, namespace = 'ingress-nginx'): Puerta => ({
+  id: `${nodo}/${puerto}/TCP`,
   nodo,
   puerto,
   protocolo: 'TCP',
@@ -86,6 +91,7 @@ const guia = () =>
     ],
     ingress: [
       {
+        id: 'default/backend',
         nombre: 'backend',
         namespace: 'default',
         clase: 'nginx',
@@ -97,8 +103,9 @@ const guia = () =>
       nodePort('lab-control-plane', 30010, 'backend'),
       nodePort('lab-worker', 30010, 'backend'),
       nodePort('lab-worker2', 30010, 'backend'),
-      hostPort('lab-worker2', 80, 'ingress-nginx-controller-6b9f-lx2wp'),
+      // por id, como las manda la foto: 443 antes que 80
       hostPort('lab-worker2', 443, 'ingress-nginx-controller-6b9f-lx2wp'),
+      hostPort('lab-worker2', 80, 'ingress-nginx-controller-6b9f-lx2wp'),
     ],
   });
 

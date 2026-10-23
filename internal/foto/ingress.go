@@ -9,6 +9,8 @@ import (
 
 // Ingress es un Ingress con su clase, sus reglas y la anotación de rewrite de ingress-nginx.
 type Ingress struct {
+	// ID es "<namespace>/<nombre>".
+	ID        string `json:"id"`
 	Nombre    string `json:"nombre"`
 	Namespace string `json:"namespace"`
 	// Clase es spec.ingressClassName, o la anotación vieja kubernetes.io/ingress.class; nil si no tiene.
@@ -39,7 +41,7 @@ const (
 func ingresses(o Objetos) []Ingress {
 	out := []Ingress{}
 	for _, ing := range o.Ingress {
-		i := Ingress{Nombre: ing.Name, Namespace: ing.Namespace, Reglas: []ReglaIngress{}}
+		i := Ingress{ID: ing.Namespace + "/" + ing.Name, Nombre: ing.Name, Namespace: ing.Namespace, Reglas: []ReglaIngress{}}
 		if ing.Spec.IngressClassName != nil {
 			i.Clase = opcional(*ing.Spec.IngressClassName)
 		} else {
@@ -69,13 +71,7 @@ func ingresses(o Objetos) []Ingress {
 		}
 		out = append(out, i)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if a.Namespace != b.Namespace {
-			return a.Namespace < b.Namespace
-		}
-		return a.Nombre < b.Nombre
-	})
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
 }
 

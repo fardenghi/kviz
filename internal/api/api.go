@@ -4,6 +4,7 @@
 // Rutas:
 //
 //	GET /api/foto   foto completa del cluster (ver internal/foto)
+//	GET /api/stream canal de streaming (Server-Sent Events): la foto y sus cambios (ver stream.go)
 //	GET /           la interfaz compilada (web/dist)
 package api
 
@@ -17,6 +18,8 @@ import (
 // Cluster es lo que la API necesita del cluster conectado.
 type Cluster interface {
 	Foto() foto.Foto
+	// Suscribir avisa cada vez que la foto puede haber cambiado; cancelar deja de avisar.
+	Suscribir() (avisos <-chan struct{}, cancelar func())
 }
 
 // Nuevo arma el handler HTTP de kviz. ui sirve la interfaz (web.Handler); si es nil no se sirve.
@@ -25,6 +28,7 @@ func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/foto", func(w http.ResponseWriter, r *http.Request) {
 		responderJSON(w, cluster.Foto())
 	})
+	mux.HandleFunc("GET /api/stream", transmitirFoto(cluster))
 	if ui != nil {
 		mux.Handle("GET /", ui)
 	}

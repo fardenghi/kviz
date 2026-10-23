@@ -219,7 +219,7 @@ func TestUnJobOUnReplicaSetSinDuenoSonWorkloadsPropios(t *testing.T) {
 	for _, w := range f.Workloads {
 		ids = append(ids, w.ID)
 	}
-	want := []string{"ReplicaSet/default/cache", "Job/default/migracion"}
+	want := []string{"Job/default/migracion", "ReplicaSet/default/cache"} // ordenados por id
 	if !reflect.DeepEqual(ids, want) {
 		t.Fatalf("workloads = %v, want %v", ids, want)
 	}

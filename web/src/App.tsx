@@ -1,47 +1,40 @@
 import { useEffect, useMemo, useState } from 'react';
-import { pedirFoto } from './api';
+import { escucharFoto } from './api';
 import { construirEscena, namespacesDelFiltro, workloadsVisibles } from './escena/escena';
-import type { Foto } from './foto';
 import { Lienzo } from './lienzo/Lienzo';
 import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
-
-// Mientras kviz está desconectado vuelve a pedir la foto cada tanto. Las actualizaciones en vivo
-// llegan con el canal de streaming (ticket de tiempo real).
-const REINTENTO_MS = 2000;
+import { EN_VIVO_INICIAL, type EnVivo, finDelBrillo, podsNuevos, recibir } from './tiempoReal';
 
 export function App() {
-  // la foto anterior va a la escena para marcar lo que cambió (reinicios que aumentaron)
-  const [{ foto, fotoAnterior }, setFotos] = useState<{ foto: Foto | null; fotoAnterior?: Foto }>({ foto: null });
-  const setFoto = (f: Foto) => setFotos((s) => ({ foto: f, fotoAnterior: s.foto ?? undefined }));
-  const [error, setError] = useState<string | null>(null);
+  // la foto llega por el canal de streaming y se actualiza sola (ver tiempoReal.ts)
+  const [enVivo, setEnVivo] = useState<EnVivo>(EN_VIVO_INICIAL);
+  const [cortado, setCortado] = useState(false);
+  // se cambia cuando termina el brillo de los pods nuevos, para volver a armar la escena sin él
+  const [finBrillo, setFinBrillo] = useState(0);
   const [mostrarSistema, setMostrarSistema] = useState(false);
   const [namespace, setNamespace] = useState<string | null>(null);
   const [workload, setWorkload] = useState<string | null>(null);
 
-  useEffect(() => {
-    let vivo = true;
-    let espera: ReturnType<typeof setTimeout>;
-    const pedir = () =>
-      pedirFoto().then(
-        (f) => {
-          if (!vivo) return;
-          setFoto(f);
-          setError(null);
-          if (!f.conectado) espera = setTimeout(pedir, REINTENTO_MS);
+  useEffect(
+    () =>
+      escucharFoto(
+        (m) => {
+          setEnVivo((e) => recibir(e, m, Date.now()));
+          setCortado(false);
         },
-        (e: Error) => {
-          if (!vivo) return;
-          setError(e.message);
-          espera = setTimeout(pedir, REINTENTO_MS);
-        },
-      );
-    pedir();
-    return () => {
-      vivo = false;
-      clearTimeout(espera);
-    };
-  }, []);
+        () => setCortado(true),
+      ),
+    [],
+  );
 
+  useEffect(() => {
+    const fin = finDelBrillo(enVivo, Date.now());
+    if (fin === null) return;
+    const espera = setTimeout(() => setFinBrillo(fin), fin - Date.now());
+    return () => clearTimeout(espera);
+  }, [enVivo, finBrillo]);
+
+  const foto = enVivo.foto;
   const namespaces = useMemo(() => (foto ? namespacesDelFiltro(foto, { mostrarSistema }) : []), [foto, mostrarSistema]);
   // si el namespace elegido deja de ofrecerse (se ocultó el sistema o se fue), el filtro vuelve a "todos"
   const filtro = namespace !== null && namespaces.includes(namespace) ? namespace : null;
@@ -52,8 +45,17 @@ export function App() {
   // si el workload seleccionado se borra o queda oculto por los filtros, se deselecciona
   const workloadSeleccionado = workload !== null && workloads.some((w) => w.id === workload) ? workload : null;
   const escena = useMemo(
-    () => (foto?.conectado ? construirEscena(foto, { fotoAnterior, mostrarSistema, namespace: filtro, workloadSeleccionado }) : null),
-    [foto, fotoAnterior, mostrarSistema, filtro, workloadSeleccionado],
+    () =>
+      foto?.conectado
+        ? construirEscena(foto, {
+            fotoAnterior: enVivo.anterior ?? undefined,
+            mostrarSistema,
+            namespace: filtro,
+            workloadSeleccionado,
+            podsNuevos: podsNuevos(enVivo, Date.now()),
+          })
+        : null,
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (
@@ -87,9 +89,9 @@ export function App() {
           </>
         )}
       </header>
-      {error && <div className="aviso">No se pudo hablar con kviz: {error}</div>}
-      {!error && !foto && <div className="aviso">Cargando…</div>}
-      {!error && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
+      {cortado && <div className="aviso">Se cortó la conexión con kviz; reintentando…</div>}
+      {!cortado && !foto && <div className="aviso">Cargando…</div>}
+      {!cortado && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
       {escena && (
         <Lienzo escena={escena} alClicEnVacio={() => setWorkload(null)}>
           <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={setWorkload} />

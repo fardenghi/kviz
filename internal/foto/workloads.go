@@ -149,16 +149,7 @@ func cadenas(o Objetos) ([]Workload, map[string]string) {
 		}
 		lista = append(lista, *w)
 	}
-	sort.Slice(lista, func(i, j int) bool {
-		a, b := lista[i], lista[j]
-		if a.Namespace != b.Namespace {
-			return a.Namespace < b.Namespace
-		}
-		if a.Nombre != b.Nombre {
-			return a.Nombre < b.Nombre
-		}
-		return a.Tipo < b.Tipo
-	})
+	sort.Slice(lista, func(i, j int) bool { return lista[i].ID < lista[j].ID })
 	return lista, workloadDePod
 }
 

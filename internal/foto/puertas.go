@@ -1,6 +1,7 @@
 package foto
 
 import (
+	"fmt"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +19,8 @@ type HostPort struct {
 // Puerta es un puerto abierto en un nodo hacia el cluster (ver GLOSSARY.md): un NodePort, que se
 // abre en todos los nodos, o un hostPort, que se abre solo en el nodo de su pod.
 type Puerta struct {
+	// ID es "<nodo>/<puerto>/<protocolo>": en un nodo, un puerto y protocolo abre una sola puerta.
+	ID        string `json:"id"`
 	Nodo      string `json:"nodo"`
 	Puerto    int32  `json:"puerto"`
 	Protocolo string `json:"protocolo"`
@@ -58,8 +61,9 @@ func hostPorts(p *corev1.Pod) []HostPort {
 }
 
 // puertas deriva las puertas: cada nodePort abre una puerta en cada nodo, y cada hostPort una
-// puerta solo en el nodo de su pod, mientras el pod no terminó. Quedan ordenadas por nodo, con
-// las NodePort primero, y por puerto.
+// puerta solo en el nodo de su pod, mientras el pod no terminó. Quedan ordenadas por id; si dos
+// chocan en el mismo nodo, puerto y protocolo (un cluster mal armado), queda la NodePort, o el
+// pod de menor id.
 func puertas(nodos []Nodo, services []Service, o Objetos) []Puerta {
 	out := []Puerta{}
 	for _, s := range services {
@@ -82,18 +86,31 @@ func puertas(nodos []Nodo, services []Service, o Objetos) []Puerta {
 				Namespace: p.Namespace, Pod: opcional(p.Name), HaciaPuerto: hp.ContainerPort})
 		}
 	}
+	for i := range out {
+		out[i].ID = fmt.Sprintf("%s/%d/%s", out[i].Nodo, out[i].Puerto, out[i].Protocolo)
+	}
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := out[i], out[j]
-		if a.Nodo != b.Nodo {
-			return a.Nodo < b.Nodo
+		if a.ID != b.ID {
+			return a.ID < b.ID
 		}
 		if a.Tipo != b.Tipo {
 			return a.Tipo == PuertaNodePort
 		}
-		if a.Puerto != b.Puerto {
-			return a.Puerto < b.Puerto
-		}
-		return a.Protocolo < b.Protocolo
+		return a.Namespace+"/"+deref(a.Pod) < b.Namespace+"/"+deref(b.Pod)
 	})
-	return out
+	unicas := []Puerta{}
+	for _, p := range out {
+		if len(unicas) == 0 || unicas[len(unicas)-1].ID != p.ID {
+			unicas = append(unicas, p)
+		}
+	}
+	return unicas
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

@@ -11,6 +11,7 @@ import (
 
 // Ingress de la foto, tal como los lee la interfaz (web/src/foto.ts).
 type ingressEnFoto struct {
+	ID        string           `json:"id"`
 	Nombre    string           `json:"nombre"`
 	Namespace string           `json:"namespace"`
 	Clase     *string          `json:"clase"`
@@ -41,7 +42,7 @@ func TestLaFotoTraeElIngressDeLaGuiaConClaseReglaYRewrite(t *testing.T) {
 	got := kviz.ingress(t)
 
 	want := []ingressEnFoto{{
-		Nombre: "backend", Namespace: "default", Clase: ptr("nginx"), Rewrite: ptr("/$2"),
+		ID: "default/backend", Nombre: "backend", Namespace: "default", Clase: ptr("nginx"), Rewrite: ptr("/$2"),
 		Reglas: []reglaDeIngress{{
 			Path: "/backend(/|$)(.*)", TipoPath: "ImplementationSpecific", Service: "backend", Puerto: json.RawMessage(`80`),
 		}},
@@ -68,7 +69,7 @@ func TestUnIngressSinClaseNiRewriteConVariosHostsYPuertoPorNombre(t *testing.T) 
 	got := kviz.ingress(t)
 
 	want := []ingressEnFoto{{
-		Nombre: "legacy", Namespace: "otro", Clase: nil, Rewrite: nil,
+		ID: "otro/legacy", Nombre: "legacy", Namespace: "otro", Clase: nil, Rewrite: nil,
 		Reglas: []reglaDeIngress{
 			{Host: "api.lab.local", Path: "/v1", TipoPath: "Prefix", Service: "old-api", Puerto: json.RawMessage(`"http"`)},
 			{Host: "web.lab.local", Path: "/", TipoPath: "Prefix", Service: "web", Puerto: json.RawMessage(`80`)},
@@ -96,6 +97,27 @@ func TestLaClaseDeUnIngressPuedeVenirDeLaAnotacionVieja(t *testing.T) {
 
 	if len(got) != 1 || got[0].Clase == nil || *got[0].Clase != "nginx" {
 		t.Fatalf("ingress = %s, want clase nginx", mostrar(got))
+	}
+}
+
+func TestLosIngressVanOrdenadosPorID(t *testing.T) {
+	ingress := func(ns, nombre string) *networkingv1.Ingress {
+		return &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: nombre},
+			Spec:       networkingv1.IngressSpec{DefaultBackend: backendIngress("web", 80, "")},
+		}
+	}
+	kviz := nuevoKviz(t, "kind-lab", ingress("default", "web"), ingress("a", "web"), ingress("a-b", "web"))
+
+	got := []string{}
+	for _, i := range kviz.ingress(t) {
+		got = append(got, i.ID)
+	}
+
+	// el orden del id, como lo inserta la interfaz al recibir un cambio ("-" va antes que "/")
+	want := []string{"a-b/web", "a/web", "default/web"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ids = %v, want %v", got, want)
 	}
 }
 

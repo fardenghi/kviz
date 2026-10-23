@@ -15,7 +15,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// Foto es el estado del cluster tal como lo ve la interfaz.
+// Foto es el estado del cluster tal como lo ve la interfaz. Viaja completa al conectarse y
+// después como cambios (ver Cambio): cada objeto de una lista lleva un "id" único en su lista,
+// y las listas van ordenadas por id.
 type Foto struct {
 	// Contexto es el contexto de kubectl de kviz (por ejemplo "kind-lab"); "" si no hay ninguno.
 	Contexto string `json:"contexto"`
@@ -25,22 +27,26 @@ type Foto struct {
 	Motivo string `json:"motivo,omitempty"`
 	Nodos  []Nodo `json:"nodos"`
 	Pods   []Pod  `json:"pods"`
-	// Workloads son los workloads de arriba de cada cadena de dueños (ver workloads.go).
+	// Workloads son los workloads de arriba de cada cadena de dueños (ver workloads.go), ordenados por id.
 	Workloads []Workload `json:"workloads"`
-	// Services ordenados por namespace y nombre.
+	// Services ordenados por id (namespace y nombre).
 	Services []Service `json:"services"`
-	// Ingress ordenados por namespace y nombre.
+	// Ingress ordenados por id (namespace y nombre).
 	Ingress []Ingress `json:"ingress"`
-	// Puertas ordenadas por nodo, con las NodePort primero, y por puerto.
+	// Puertas ordenadas por id (nodo, puerto y protocolo).
 	Puertas []Puerta `json:"puertas"`
 }
 
 type Nodo struct {
+	// ID es el nombre del nodo.
+	ID         string `json:"id"`
 	Nombre     string `json:"nombre"`
 	InternalIP string `json:"internalIP"`
 }
 
 type Pod struct {
+	// ID es "<namespace>/<nombre>".
+	ID        string `json:"id"`
 	Nombre    string `json:"nombre"`
 	Namespace string `json:"namespace"`
 	// Nodo es nil cuando el scheduler todavía no le asignó un nodo.
@@ -62,6 +68,8 @@ type Pod struct {
 
 // Service es un Service con sus endpoints, tomados de sus EndpointSlices.
 type Service struct {
+	// ID es "<namespace>/<nombre>".
+	ID        string `json:"id"`
 	Nombre    string `json:"nombre"`
 	Namespace string `json:"namespace"`
 	// Tipo es spec.type: ClusterIP, NodePort, LoadBalancer o ExternalName.
@@ -109,19 +117,20 @@ type Objetos struct {
 	Ingress        []*networkingv1.Ingress
 }
 
-// Construir traduce los objetos a la foto. Es pura y determinista: ordena nodos por nombre
-// y pods por namespace y nombre, así la misma entrada da siempre la misma foto.
+// Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
+// (nodos por nombre, pods por namespace y nombre), así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
 	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Workloads: []Workload{}, Ingress: ingresses(o)}
 	for _, n := range o.Nodos {
-		f.Nodos = append(f.Nodos, Nodo{Nombre: n.Name, InternalIP: internalIP(n)})
+		f.Nodos = append(f.Nodos, Nodo{ID: n.Name, Nombre: n.Name, InternalIP: internalIP(n)})
 	}
-	sort.Slice(f.Nodos, func(i, j int) bool { return f.Nodos[i].Nombre < f.Nodos[j].Nombre })
+	sort.Slice(f.Nodos, func(i, j int) bool { return f.Nodos[i].ID < f.Nodos[j].ID })
 
 	workloads, workloadDePod := cadenas(o)
 	f.Workloads = workloads
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
+			ID:         p.Namespace + "/" + p.Name,
 			Nombre:     p.Name,
 			Namespace:  p.Namespace,
 			Nodo:       opcional(p.Spec.NodeName),
@@ -133,13 +142,7 @@ func Construir(contexto string, o Objetos) Foto {
 			HostPorts:  hostPorts(p),
 		})
 	}
-	sort.Slice(f.Pods, func(i, j int) bool {
-		a, b := f.Pods[i], f.Pods[j]
-		if a.Namespace != b.Namespace {
-			return a.Namespace < b.Namespace
-		}
-		return a.Nombre < b.Nombre
-	})
+	sort.Slice(f.Pods, func(i, j int) bool { return f.Pods[i].ID < f.Pods[j].ID })
 	f.Puertas = puertas(f.Nodos, f.Services, o)
 	return f
 }
@@ -161,6 +164,7 @@ func services(o Objetos) []Service {
 	out := []Service{}
 	for _, s := range o.Services {
 		svc := Service{
+			ID:        s.Namespace + "/" + s.Name,
 			Nombre:    s.Name,
 			Namespace: s.Namespace,
 			Tipo:      string(s.Spec.Type),
@@ -191,13 +195,7 @@ func services(o Objetos) []Service {
 		}
 		out = append(out, svc)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if a.Namespace != b.Namespace {
-			return a.Namespace < b.Namespace
-		}
-		return a.Nombre < b.Nombre
-	})
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
 }
 

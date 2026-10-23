@@ -43,15 +43,26 @@ sirve una página que explica cómo compilarla.
 |---|---|
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
 | `internal/conexion/` | 1 · conexión al cluster: contexto de kubectl, informers, conectado/desconectado |
-| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`) y costura 1 |
+| `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream |
+| `internal/api/` | 12 · API HTTP (`GET /api/foto`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
+| `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
 | `web/src/escena/` | escena de la vista de topología: función pura (costura 2) |
 | `web/src/escena/workloads.ts` | marca de workload por pod, selección de workload y texto de la cadena |
 | `web/src/lienzo/` | lienzo SVG: zoom, arrastre, encuadrar |
 | `web/src/superficies/` | superficies flotantes (lista de workloads, …) |
 | `web/src/App.tsx` | barra de arriba (contexto, conexión) y armado de la pantalla |
 
-Para agregar un objeto a la foto: su informer en `internal/conexion`, el campo en `foto.Objetos`,
-`foto.Foto` y `foto.Construir`, el espejo en `web/src/foto.ts`, y lo que dibuja en `web/src/escena`.
+Para agregar un objeto a la foto: su informer en `internal/conexion` (con el handler de avisos, para
+que sus cambios lleguen en vivo), el campo en `foto.Objetos`, `foto.Foto` y `foto.Construir`, el espejo
+en `web/src/foto.ts`, y lo que dibuja en `web/src/escena`. Cada objeto de una lista de la foto lleva
+un `id` único en su lista y la lista va ordenada por id: así el stream manda solo los objetos que
+cambiaron sin código nuevo.
+
+## Tiempo real
+
+`GET /api/stream` es un stream de Server-Sent Events. Cada mensaje es `data: <JSON>` con un campo
+`tipo`: primero `{"tipo":"foto","foto":{…}}` con la foto completa y después
+`{"tipo":"cambios","cambios":[…]}` con lo que cambió (ver `foto.Cambio`). El canal admite más tipos
+de mensaje; el escritor de SSE (`sse` en `stream.go`) sirve también para otras rutas.
