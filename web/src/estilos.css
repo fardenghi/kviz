@@ -26,6 +26,8 @@ body { background: var(--fondo); }
 .barra { display: flex; align-items: center; gap: 14px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--linea); }
 .marca { font-size: 14px; letter-spacing: .02em; }
 .contexto { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 12px; }
+.contexto select { font: inherit; color: var(--tinta); border: 1px solid transparent; border-radius: 6px; background: transparent; padding: 1px 2px; cursor: pointer; }
+.contexto select:hover { border-color: var(--linea); }
 .punto { width: 8px; height: 8px; border-radius: 50%; }
 .punto-conectado { background: var(--ok); }
 .punto-desconectado { background: var(--mal); }

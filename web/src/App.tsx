@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { escucharFoto } from './api';
+import { cambiarContexto, escucharFoto, pedirContextos } from './api';
 import { construirEscena, namespacesDelFiltro, workloadsVisibles } from './escena/escena';
 import { Lienzo } from './lienzo/Lienzo';
 import { ListaDeWorkloads } from './superficies/ListaDeWorkloads';
@@ -14,6 +14,13 @@ export function App() {
   const [mostrarSistema, setMostrarSistema] = useState(false);
   const [namespace, setNamespace] = useState<string | null>(null);
   const [workload, setWorkload] = useState<string | null>(null);
+  // contextos de kubectl para el selector; se vuelven a pedir al abrirlo y cuando cambia la conexión
+  const [contextos, setContextos] = useState<string[]>([]);
+  const [errorContexto, setErrorContexto] = useState<string | null>(null);
+  const refrescarContextos = () =>
+    pedirContextos()
+      .then((c) => setContextos(c.contextos))
+      .catch(() => {}); // el selector queda con la lista anterior
 
   useEffect(
     () =>
@@ -35,6 +42,18 @@ export function App() {
   }, [enVivo, finBrillo]);
 
   const foto = enVivo.foto;
+  useEffect(() => {
+    refrescarContextos();
+  }, [foto?.contexto, foto?.conectado]); // eslint-disable-line react-hooks/exhaustive-deps
+  const elegirContexto = (nombre: string) => {
+    setErrorContexto(null);
+    setNamespace(null);
+    setWorkload(null);
+    cambiarContexto(nombre).catch((e: Error) => setErrorContexto(e.message));
+  };
+  // el contexto de kviz va siempre en el selector, aunque su cluster se haya borrado del kubeconfig
+  const opcionesDeContexto =
+    foto && foto.contexto && !contextos.includes(foto.contexto) ? [foto.contexto, ...contextos] : contextos;
   const namespaces = useMemo(() => (foto ? namespacesDelFiltro(foto, { mostrarSistema }) : []), [foto, mostrarSistema]);
   // si el namespace elegido deja de ofrecerse (se ocultó el sistema o se fue), el filtro vuelve a "todos"
   const filtro = namespace !== null && namespaces.includes(namespace) ? namespace : null;
@@ -65,7 +84,23 @@ export function App() {
         {foto && (
           <span className="contexto" title="Contexto de kubectl">
             <span className={foto.conectado ? 'punto punto-conectado' : 'punto punto-desconectado'} />
-            {foto.contexto || 'sin contexto'}
+            {opcionesDeContexto.length > 0 ? (
+              <select
+                aria-label="Contexto de kubectl"
+                value={foto.contexto}
+                onFocus={refrescarContextos}
+                onChange={(e) => elegirContexto(e.target.value)}
+              >
+                {!foto.contexto && <option value="">sin contexto</option>}
+                {opcionesDeContexto.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              foto.contexto || 'sin contexto'
+            )}
             {!foto.conectado && <span className="tenue-texto">· desconectado</span>}
           </span>
         )}
@@ -89,6 +124,7 @@ export function App() {
           </>
         )}
       </header>
+      {errorContexto && <div className="aviso">No se pudo cambiar de contexto: {errorContexto}</div>}
       {cortado && <div className="aviso">Se cortó la conexión con kviz; reintentando…</div>}
       {!cortado && !foto && <div className="aviso">Cargando…</div>}
       {!cortado && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
