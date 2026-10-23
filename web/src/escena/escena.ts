@@ -4,7 +4,7 @@ import type { Foto, Ingress, Pod, Puerta, PuertoService, ReglaIngress, Service, 
 import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWorkload } from './workloads';
 import { type MarcasPod, marcasDePod } from './marcas-pod';
 import { aplicarFoco } from './foco';
-import { aplicarRecorrido } from './recorrido';
+import { aplicarRecorrido, podsDelIngressController } from './recorrido';
 import type { Recorrido, Reparto } from '../prueba';
 import { aplicarReparto } from './reparto';
 import { advertenciasPorObjeto, titulosDe } from './advertencias';
@@ -18,8 +18,8 @@ export interface EstadoInterfaz {
   /** Filtro por namespace: solo se ven los pods de este namespace. Sin valor, todos. */
   namespace?: string | null;
   /**
-   * ids (`pod:<namespace>/<nombre>`) de pods que participan del recorrido y se ven aunque los
-   * filtros los oculten, como el pod del Ingress Controller. Lo completa el recorrido (ticket 17).
+   * ids (`pod:<namespace>/<nombre>`) de pods que se ven aunque los filtros los oculten. Los pods del
+   * Ingress Controller por los que pasa el recorrido se suman solos (ver recorrido.ts).
    */
   podsDelRecorrido?: string[];
   /** ids de escena de los pods que acaban de aparecer y tienen que brillar (ver tiempoReal.ts). */
@@ -38,6 +38,8 @@ export interface EstadoInterfaz {
    * sobre todo lo demás: apaga el foco y atenúa lo que no participa.
    */
   recorrido?: Recorrido | null;
+  /** Número del paso del recorrido elegido con un clic en la tarjeta: se resalta solo ese paso. */
+  pasoElegido?: number | null;
   /** Reparto de la request de prueba repetida que se está mirando: pastilla `n/N` sobre cada pod (ver reparto.ts). */
   reparto?: Reparto | null;
 }
@@ -66,7 +68,7 @@ export interface MarcasDeRecorrido {
   pasos: number[];
 }
 
-export interface RegionEnEscena extends Caja {
+export interface RegionEnEscena extends Caja, MarcasDeRecorrido {
   id: string;
   /** Nombre del nodo, o null para la región "Sin nodo asignado". */
   nodo: string | null;
@@ -168,6 +170,25 @@ export interface ConexionEnEscena {
   fin: Punto;
 }
 
+/**
+ * Arco del salto entre nodos de un recorrido: una cúbica de `desde` a `hasta` (los bordes de abajo
+ * del objeto de donde sale y del pod al que llega) con los dos controles a la altura `yControl`,
+ * que la hace pasar por debajo de las regiones. La etiqueta va en su punto medio, el más bajo.
+ */
+export interface SaltoEnEscena {
+  id: string;
+  /** Número del paso del salto. */
+  paso: number;
+  desde: Punto;
+  hasta: Punto;
+  yControl: number;
+  /** `salto lab-worker2 → lab-worker`. */
+  etiqueta: string;
+  etiquetaEn: Punto;
+  /** 1, o atenuado cuando hay otro paso elegido. */
+  opacidad: number;
+}
+
 export interface Escena {
   /** Tamaño total de la escena; todo lo que se dibuja cae en [0, ancho] × [0, alto]. */
   ancho: number;
@@ -178,6 +199,8 @@ export interface Escena {
   ingress: IngressEnEscena[];
   puertas: PuertaEnEscena[];
   conexiones: ConexionEnEscena[];
+  /** Arcos de salto entre nodos del recorrido (ver recorrido.ts); vacío sin recorrido. */
+  saltos: SaltoEnEscena[];
   /** id del objeto con foco (hover o selección), o null. */
   foco: string | null;
   /** ids de los objetos relacionados con el foco, incluido el foco, ordenados; vacío sin foco. */
@@ -272,7 +295,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const pods: PodEnEscena[] = [];
 
   const advertencias = advertenciasPorObjeto(foto);
-  const delRecorrido = new Set(estado.podsDelRecorrido);
+  const delRecorrido = new Set([...(estado.podsDelRecorrido ?? []), ...podsDelIngressController(estado.recorrido)]);
   const workloads = indiceDeWorkloads(foto);
   const seleccionado = estado.workloadSeleccionado ? workloads.get(estado.workloadSeleccionado) : undefined;
   const visibles = foto.pods.filter((p) =>
@@ -301,7 +324,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   for (const { pods: suyos, ...g } of grupos) {
     const filas = Math.max(1, Math.ceil(suyos.length / M.columnas));
     const alto = M.cabecera + filas * (M.altoPod + M.hueco) - M.hueco + M.relleno;
-    regiones.push({ ...g, x, y, ancho: anchoRegion, alto });
+    regiones.push({ ...g, x, y, ancho: anchoRegion, alto, pasos: [] });
     suyos.forEach((p, i) => {
       const tarjeta = {
         x: x + M.relleno + (i % M.columnas) * (M.anchoPod + M.hueco),
@@ -399,7 +422,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const cajas: Caja[] = [...regiones, ...ingress, ...services];
   const ancho = Math.max(0, ...cajas.map((c) => c.x + c.ancho));
   const alto = Math.max(0, ...cajas.map((c) => c.y + c.alto));
-  const escena = aplicarFoco({ ancho, alto, regiones, pods, services, ingress, puertas, conexiones, foco: null, relacionados: [] }, estado, delWorkload);
+  const escena = aplicarFoco({ ancho, alto, regiones, pods, services, ingress, puertas, conexiones, saltos: [], foco: null, relacionados: [] }, estado, delWorkload);
   return aplicarReparto(aplicarRecorrido(escena, foto, estado), estado);
 }
 
