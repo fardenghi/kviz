@@ -1,0 +1,87 @@
+# Release de kviz: `git tag vX.Y.Z && git push --tags` dispara .github/workflows/release.yml,
+# que corre `goreleaser release --clean`. Prueba local: `goreleaser release --snapshot --clean`.
+version: 2
+
+project_name: kviz
+
+before:
+  hooks:
+    # la interfaz se incluye en el binario con go:embed, así que se compila antes que Go
+    - npm --prefix web ci --no-audit --no-fund --loglevel=error
+    - npm --prefix web run build
+
+builds:
+  - id: kviz
+    main: ./cmd/kviz
+    binary: kviz
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: kviz
+    ids: [kviz]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot+{{ .ShortCommit }}"
+
+changelog:
+  sort: asc
+
+# El remoto de git puede no ser el repo público (p. ej. antes del subtree split), así que
+# el destino del release y las URLs de descarga van fijos.
+release:
+  github:
+    owner: fardenghi
+    name: kviz
+
+homebrew_casks:
+  - name: kviz
+    ids: [kviz]
+    binaries: [kviz]
+    directory: Casks
+    homepage: https://github.com/fardenghi/kviz
+    description: Local live view of your Kubernetes cluster's topology and traffic paths
+    repository:
+      owner: fardenghi
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    commit_msg_template: "kviz {{ .Tag }}"
+    hooks:
+      post:
+        # los binarios no están firmados ni notarizados: sin esto Gatekeeper no los deja abrir
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/kviz"]
+          end
+
+krews:
+  - name: kviz
+    ids: [kviz]
+    homepage: https://github.com/fardenghi/kviz
+    short_description: Live view of the cluster's topology and traffic paths
+    description: |
+      kviz opens a local web view of the cluster in your current kubectl context:
+      nodes, pods, Services and Ingresses, and the path a request takes through them.
+      It reads the cluster and only writes one probe pod in kviz-system, which it
+      deletes on exit.
+    caveats: |
+      Run `kubectl kviz` and it opens the view in your browser (it listens on 127.0.0.1).
+      Flags pass through, e.g. `kubectl kviz -puerto 8000 -no-abrir`.
+    # el primer PR a kubernetes-sigs/krew-index es manual; los siguientes los hace el bot de krew
+    skip_upload: true
