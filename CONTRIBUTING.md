@@ -31,13 +31,18 @@ serves a page explaining how to build it. Release builds inject the version with
 make test       # go test ./... + vitest
 ```
 
-Tests go through two seams:
+Tests go through three seams:
 
 - **Seam 1** (`internal/api/*_test.go`): tests of the HTTP API against client-go's fake client
   (`fake.NewClientset`) and `httptest`. The harness is in `internal/api/kviz_test.go`. In these
   tests `kubeconfigDePrueba` (`internal/api/contexto_test.go`) provides several fake clusters that
   can be created, deleted or brought down, and `sondeoDePrueba` stands in for the probe pod.
-- **Seam 2** (`web/src/escena/*.test.ts`): Vitest tests of the pure scene function.
+- **Seam 2** (`web/src/escena/*.test.ts`): Vitest tests of the pure scene function,
+  `construirEscena`, and of the other pure functions `escena/` exports to the surfaces
+  (`namespacesDelFiltro`, `workloadsVisibles`, `textoDeCadena` for the workload list).
+- **Seam 3** (`web/src/*.test.ts`): Vitest tests of the pure UI functions outside the scene that
+  turn API data into what the surfaces show: `tiempoReal.ts` (applying stream messages, new-pod
+  glow) and `events.ts` (the events strip, the object a click selects, an object's events).
 
 `cmd/kviz/main_test.go` also builds the binary to check the `-version` flag.
 
