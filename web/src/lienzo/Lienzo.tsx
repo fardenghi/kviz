@@ -1,7 +1,7 @@
 // Lienzo (módulo 2 del frontend): dibuja la escena en SVG, con zoom por rueda, arrastre y botón de
 // encuadrar. No decide nada sobre el cluster: todo lo que dibuja viene de la escena.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Escena, PodEnEscena, RegionEnEscena } from '../escena/escena';
+import type { ConexionEnEscena, Escena, PodEnEscena, RegionEnEscena, ServiceEnEscena } from '../escena/escena';
 import { encuadrar, type Vista, zoomEn } from './vista';
 
 export function Lienzo({ escena }: { escena: Escena }) {
@@ -56,6 +56,12 @@ export function Lienzo({ escena }: { escena: Escena }) {
           {escena.regiones.map((r) => (
             <Region key={r.id} region={r} />
           ))}
+          {escena.conexiones.map((c) => (
+            <Conexion key={c.id} conexion={c} />
+          ))}
+          {escena.services.map((s) => (
+            <TarjetaService key={s.id} service={s} />
+          ))}
           {escena.pods.map((p) => (
             <TarjetaPod key={p.id} pod={p} />
           ))}
@@ -77,6 +83,31 @@ function Region({ region: r }: { region: RegionEnEscena }) {
       <rect x={r.x} y={r.y} width={r.ancho} height={r.alto} rx={14} className={r.nodo ? 'region' : 'region region-sin-nodo'} />
       <text x={r.x + 16} y={r.y + 25} className="region-titulo">{r.titulo}</text>
       <text x={r.x + 16} y={r.y + 40} className="mono tenue">{r.subtitulo}</text>
+    </g>
+  );
+}
+
+// curva de abajo de un objeto a arriba del otro, con los controles a media altura
+function Conexion({ conexion: c }: { conexion: ConexionEnEscena }) {
+  const { inicio: a, fin: b } = c;
+  const my = (a.y + b.y) / 2;
+  return <path d={`M${a.x},${a.y} C${a.x},${my} ${b.x},${my} ${b.x},${b.y}`} className={`conexion conexion-${c.tono}`} />;
+}
+
+function TarjetaService({ service: s }: { service: ServiceEnEscena }) {
+  const puertos = s.puertos.join(', ');
+  return (
+    <g>
+      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className="service" />
+      <text x={s.x + 20} y={s.y + 20} className="pod-nombre">
+        {recortar(s.nombre, s.ancho - 12 - 6.2 * (s.tipo.length + 1))} <tspan className="tipo">{s.tipo}</tspan>
+        <title>{`Service ${s.nombre} · namespace ${s.namespace}`}</title>
+      </text>
+      <text x={s.x + 20} y={s.y + 35} className="mono tenue">{s.clusterIP || 'sin ClusterIP'}</text>
+      <text x={s.x + 20} y={s.y + 50} className="mono">
+        {recortar(puertos, s.ancho)}
+        <title>{puertos}</title>
+      </text>
     </g>
   );
 }

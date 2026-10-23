@@ -52,3 +52,9 @@ body { background: var(--fondo); }
 .region-titulo { font-size: 14px; font-weight: 700; fill: var(--tinta); }
 .pod { fill: #fff; stroke: #d5dae0; stroke-width: 1.2; }
 .pod-nombre { font-size: 11.5px; font-weight: 600; fill: var(--tinta); }
+.service { fill: #fff; stroke: #c9d6ef; stroke-width: 1.3; }
+.tipo { font-weight: 400; fill: var(--tenue); }
+/* conexiones en reposo: finas, grises, al 35 % y sin flecha; las de endpoints no listos, punteadas */
+.conexion { fill: none; stroke: #aab3be; stroke-width: 1.2; }
+.conexion-reposo { opacity: .35; }
+.conexion-no-listo { opacity: .3; stroke-dasharray: 3 4; }
