@@ -5,7 +5,7 @@ package api
 // la foto (ver internal/trafico).
 //
 // Pensado para crecer sin romper el contrato: la prueba de conexión TCP es otro `tipo` con su
-// resultado en otro campo; las repeticiones y el reparto, campos nuevos del pedido y de la
+// resultado en otro campo (`conexion`, ver conexion.go); las repeticiones y el reparto, campos nuevos del pedido y de la
 // respuesta; el historial, GET sobre las pruebas guardadas por `id`.
 
 import (
@@ -24,10 +24,10 @@ import (
 
 // pedidoDePrueba es el cuerpo de POST /api/pruebas.
 type pedidoDePrueba struct {
-	// Tipo es "http" (por defecto).
+	// Tipo es "http" (por defecto) o "tcp" (prueba de conexión, ver conexion.go: solo usa Destino).
 	Tipo string `json:"tipo"`
 	// Destino es `host[:puerto]` o una URL: `backend.default.svc.cluster.local:80`, `10.96.11.121`,
-	// `http://backend.default/hello`.
+	// `http://backend.default/hello`. En una prueba de conexión, `host:puerto`.
 	Destino string `json:"destino"`
 	// Metodo HTTP; GET por defecto.
 	Metodo string `json:"metodo"`
@@ -49,7 +49,10 @@ type prueba struct {
 	Origen string `json:"origen"`
 	// Respuesta es null si la request no recibió respuesta; entonces Error dice por qué.
 	Respuesta *respuestaHTTP `json:"respuesta"`
-	Error     string         `json:"error,omitempty"`
+	// Conexion es el resultado de una prueba de conexión (tipo "tcp"); no viene en una request.
+	// Si es null, Error dice por qué no se pudo intentar.
+	Conexion *conexionTCP `json:"conexion,omitempty"`
+	Error    string       `json:"error,omitempty"`
 	// Recorrido es el camino calculado desde la configuración, completado con el pod que respondió
 	// si se puede saber.
 	Recorrido trafico.Recorrido `json:"recorrido"`
@@ -77,6 +80,10 @@ func mandarPrueba(cluster Cluster, ids *atomic.Int64) http.HandlerFunc {
 		}
 		if p.Tipo == "" {
 			p.Tipo = "http"
+		}
+		if p.Tipo == "tcp" {
+			mandarConexion(w, r, cluster, ids, p)
+			return
 		}
 		if p.Tipo != "http" {
 			http.Error(w, fmt.Sprintf("tipo de prueba desconocido: %q", p.Tipo), http.StatusBadRequest)

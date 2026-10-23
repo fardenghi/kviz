@@ -85,6 +85,34 @@ func URL(destino, path string) (*url.URL, error) {
 	return u, nil
 }
 
+// URLTCP arma el destino de una prueba de conexión como URL `tcp://host:puerto`, para calcular su
+// recorrido con Recorrer igual que el de una request. destino es `host:puerto` (con o sin `tcp://`);
+// el puerto es obligatorio, porque no hay uno por defecto.
+func URLTCP(destino string) (*url.URL, error) {
+	destino = strings.TrimSpace(destino)
+	if destino == "" {
+		return nil, fmt.Errorf("falta el destino")
+	}
+	if esquema, _, ok := strings.Cut(destino, "://"); ok && esquema != "tcp" {
+		return nil, fmt.Errorf("la prueba de conexión es TCP: el destino no puede ser %s://", esquema)
+	}
+	u, err := url.Parse("tcp://" + strings.TrimPrefix(destino, "tcp://"))
+	if err != nil {
+		return nil, fmt.Errorf("el destino %q no es host:puerto: %w", destino, err)
+	}
+	if u.Hostname() == "" {
+		return nil, fmt.Errorf("el destino %q no tiene host", destino)
+	}
+	if n, err := strconv.ParseUint(u.Port(), 10, 16); err != nil || n == 0 {
+		return nil, fmt.Errorf("la prueba de conexión necesita un puerto: host:puerto, como postgres.default:5432")
+	}
+	if (u.Path != "" && u.Path != "/") || u.RawQuery != "" {
+		return nil, fmt.Errorf("la prueba de conexión va a host:puerto, sin path")
+	}
+	u.Path = ""
+	return u, nil
+}
+
 // Recorrer calcula el recorrido de una request a la URL según la foto. Si el host es la ClusterIP
 // o un nombre DNS de un Service, el recorrido es Service → endpoints listos.
 func Recorrer(f foto.Foto, u *url.URL) Recorrido {

@@ -3,14 +3,14 @@
 // a las IPs internas del cluster.
 //
 // Crear y borrar este pod es la única escritura de kviz en el cluster. Se crea la primera vez que
-// hace falta (Sondeo.HTTP), se borra al cerrar kviz o al cambiar de contexto (Sondeo.Borrar), y al
-// conectarse kviz reutiliza un pod huérfano que siga corriendo o borra los que no sirven
-// (Sondeo.Adoptar).
+// hace falta (Sondeo.HTTP o Sondeo.TCP), se borra al cerrar kviz o al cambiar de contexto
+// (Sondeo.Borrar), y al conectarse kviz reutiliza un pod huérfano que siga corriendo o borra los
+// que no sirven (Sondeo.Adoptar).
 //
 // Lo que se ejecuta adentro del pod queda detrás de Ejecutor ("ejecutar y devolver el resultado
-// crudo"), que los tests reemplazan por un doble con respuestas guionadas. Para sumar un tipo de
-// pedido (la prueba de conexión TCP): un método en Ejecutor, su tipo de pedido y resultado crudo, y
-// un método en Sondeo que asegura el pod y lo ejecuta, igual que HTTP.
+// crudo"), que los tests reemplazan por un doble con respuestas guionadas. Cada tipo de pedido (la
+// request de prueba HTTP, la prueba de conexión TCP) es un método en Ejecutor, con su pedido y su
+// resultado crudo, y un método en Sondeo que asegura el pod y lo ejecuta.
 package sondeo
 
 import (
@@ -86,10 +86,46 @@ type SinRespuesta struct {
 
 func (e SinRespuesta) Error() string { return e.Motivo }
 
+// PedidoTCP es una prueba de conexión: abrir una conexión TCP a host:puerto, sin hablar ningún
+// protocolo.
+type PedidoTCP struct {
+	Host   string
+	Puerto int32
+}
+
+// Resultados de una prueba de conexión.
+const (
+	// Abre: el puerto aceptó la conexión.
+	Abre = "abre"
+	// Rechaza: el destino respondió que no (RST: nadie escucha en el puerto) o no hay ruta.
+	Rechaza = "rechaza"
+	// Timeout: nadie respondió dentro de EsperaConexion (un firewall o una NetworkPolicy que
+	// descarta, una IP que no existe).
+	Timeout = "timeout"
+)
+
+// EsperaConexion es el tiempo máximo para que se abra la conexión de una prueba de conexión.
+const EsperaConexion = 5 * time.Second
+
+// ResultadoTCP es el resultado crudo de una prueba de conexión.
+type ResultadoTCP struct {
+	// Resultado es Abre, Rechaza o Timeout.
+	Resultado string
+	// Duracion es lo que tardó en abrirse, en ser rechazada o en vencer la conexión, medido adentro
+	// del pod de sondeo.
+	Duracion time.Duration
+	// IPRemota es la IP a la que se intentó conectar; "" si no se sabe.
+	IPRemota string
+	// Motivo es el mensaje del pod de sondeo cuando no abre ("Connection refused"…).
+	Motivo string
+}
+
 // Ejecutor ejecuta pedidos adentro del pod de sondeo y devuelve el resultado crudo. Devuelve
-// SinRespuesta si el pedido salió pero no hubo respuesta; cualquier otro error es del pod de sondeo.
+// SinRespuesta si el pedido salió pero no hubo respuesta (en TCP, solo si ni siquiera se pudo
+// intentar la conexión, como un nombre que no resuelve); cualquier otro error es del pod de sondeo.
 type Ejecutor interface {
 	HTTP(ctx context.Context, pod Pod, p PedidoHTTP) (RespuestaHTTP, error)
+	TCP(ctx context.Context, pod Pod, p PedidoTCP) (ResultadoTCP, error)
 }
 
 // EsperaArranque es cuánto se espera a que el pod de sondeo recién creado esté corriendo (la
@@ -119,6 +155,17 @@ func (s *Sondeo) HTTP(ctx context.Context, p PedidoHTTP) (RespuestaHTTP, Pod, er
 		return RespuestaHTTP{}, Pod{}, err
 	}
 	r, err := s.ejecutor.HTTP(ctx, pod, p)
+	return r, pod, err
+}
+
+// TCP manda una prueba de conexión desde el pod de sondeo; si todavía no hay pod, lo crea.
+// Devuelve también el pod desde el que salió.
+func (s *Sondeo) TCP(ctx context.Context, p PedidoTCP) (ResultadoTCP, Pod, error) {
+	pod, err := s.asegurar(ctx)
+	if err != nil {
+		return ResultadoTCP{}, Pod{}, err
+	}
+	r, err := s.ejecutor.TCP(ctx, pod, p)
 	return r, pod, err
 }
 
