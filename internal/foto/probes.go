@@ -230,11 +230,7 @@ func deducir(nombre string, spec *corev1.Probe, s senales, estado func(*Probe, f
 		if i == ultimosFallos {
 			break
 		}
-		cuando := ""
-		if t := cuandoFue(e); !t.IsZero() {
-			cuando = t.UTC().Format(time.RFC3339)
-		}
-		p.Fallos = append(p.Fallos, FalloDeProbe{Motivo: e.Reason, Mensaje: e.Message, Veces: veces(e), Cuando: cuando})
+		p.Fallos = append(p.Fallos, FalloDeProbe{Motivo: e.Reason, Mensaje: e.Message, Veces: veces(e), Cuando: ultimaVez(e)})
 	}
 	estado(&p, f)
 	return p
@@ -261,32 +257,6 @@ func eventosDeProbes(eventos []corev1.Event, pods []*corev1.Pod) map[string][]co
 		out[clave] = append(out[clave], e)
 	}
 	return out
-}
-
-// cuandoFue es la última vez que pasó el event.
-func cuandoFue(e corev1.Event) time.Time {
-	switch {
-	case e.Series != nil && !e.Series.LastObservedTime.IsZero():
-		return e.Series.LastObservedTime.Time
-	case !e.LastTimestamp.IsZero():
-		return e.LastTimestamp.Time
-	case !e.EventTime.IsZero():
-		return e.EventTime.Time
-	case !e.FirstTimestamp.IsZero():
-		return e.FirstTimestamp.Time
-	}
-	return e.CreationTimestamp.Time
-}
-
-// veces es cuántas veces pasó el event.
-func veces(e corev1.Event) int32 {
-	switch {
-	case e.Series != nil && e.Series.Count > 0:
-		return e.Series.Count
-	case e.Count > 0:
-		return e.Count
-	}
-	return 1
 }
 
 func noCorre(c Container) string {
