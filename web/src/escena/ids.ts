@@ -3,7 +3,7 @@
 // `puerta:<nodo>/<puerto>[/<protocolo>]`, `nodo:<nombre>` y `workload:<id del workload>`. Es la
 // misma identificación para el foco, la selección y el panel de detalle; este módulo es el único
 // que los arma y los parte.
-import type { Puerta, Workload } from '../foto';
+import type { ObjetoEnFoto, Puerta, Workload } from '../foto';
 
 /** Un objeto con namespace, como lo identifica la foto: `<namespace>/<nombre>`. */
 export interface NsNombre {
@@ -18,6 +18,17 @@ export const idNodo = (nombre: string) => `nodo:${nombre}`;
 export const idWorkload = (w: Pick<Workload, 'id'>) => `workload:${w.id}`;
 export const idPuerta = (p: Pick<Puerta, 'nodo' | 'puerto' | 'protocolo'>) =>
   `puerta:${p.nodo}/${p.puerto}` + (p.protocolo !== 'TCP' ? `/${p.protocolo}` : '');
+
+const PREFIJO: Record<ObjetoEnFoto['seccion'], string> = {
+  pods: 'pod',
+  nodos: 'nodo',
+  services: 'service',
+  ingress: 'ingress',
+  workloads: 'workload',
+};
+
+/** id de escena de un objeto de la foto dado por su lista y su id en ella (como lo traen los events). */
+export const idDeObjetoEnFoto = (o: ObjetoEnFoto) => `${PREFIJO[o.seccion]}:${o.id}`;
 
 /** Parte un id de la foto `<namespace>/<nombre>` (el de un pod, Service o Ingress). */
 export function nsNombre(idEnFoto: string): NsNombre {

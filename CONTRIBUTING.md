@@ -77,7 +77,7 @@ npm --prefix web run dev       # UI with hot reload; /api is proxied to the back
 | `web/src/lienzo/` | SVG canvas: zoom, drag, fit to screen |
 | `web/src/superficies/` | floating surfaces (workload list, events strip, test request form, path card, …) |
 | `web/src/events.ts` | cluster events: those in the strip (with the namespace filters), the object a click selects, and an object's events for the panel |
-| `web/src/detalle/` | detail panel (drawer on the right): `detalle.ts` which object it shows; one section per file in `secciones/` (see `secciones.ts`); `Comando.tsx` suggested command with a copy button |
+| `web/src/detalle/` | detail panel (drawer on the right): `detalle.ts` which object it shows and its `fichaDe` (the one place that tells each object type apart: API type, snapshot list, scene id, header); one section per file in `secciones/` (see `secciones.ts`); `Comando.tsx` suggested command with a copy button |
 | `web/src/App.tsx` | top bar (context, connection) and screen layout |
 
 ### Adding an object to the snapshot

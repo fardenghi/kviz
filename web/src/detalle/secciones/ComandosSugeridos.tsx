@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import { type ComandoSugerido, pedirComandos } from '../../api';
 import { Comando } from '../Comando';
-import { objetoDeLaApi, type PropsDeSeccion } from '../detalle';
+import { fichaDe, type PropsDeSeccion } from '../detalle';
 import { Nada, Seccion } from '../ui';
 
 export const orden = 90;
 
 export default function ComandosSugeridos({ detalle, foto }: PropsDeSeccion) {
-  const objeto = objetoDeLaApi(detalle);
+  const objeto = fichaDe(detalle).api;
   // se vuelven a pedir si cambia el objeto, el contexto o algo del objeto que entra en los comandos
   // (réplicas, puertos, containers): la clave es el objeto mismo
   const clave = JSON.stringify([objeto, foto.contexto, detalle]);

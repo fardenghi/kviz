@@ -1,9 +1,10 @@
 // Events del cluster en la interfaz: la franja de abajo con los últimos events (con los mismos
 // filtros de namespace que la vista), el objeto que se selecciona al hacer clic en uno, y los
 // events del objeto que muestra el panel de detalle. Funciones puras.
-import type { Detalle } from './detalle/detalle';
+import { type Detalle, fichaDe } from './detalle/detalle';
+import { idDeObjetoEnFoto } from './escena/ids';
 import { type EstadoInterfaz, seVe } from './escena/escena';
-import type { EventDelCluster, Foto, ObjetoEnFoto } from './foto';
+import type { EventDelCluster, Foto } from './foto';
 
 /** Cuántos events muestra la franja: los más recientes. */
 export const EVENTS_EN_LA_FRANJA = 50;
@@ -26,40 +27,17 @@ export function eventsDeLaFranja(
     .slice(0, EVENTS_EN_LA_FRANJA);
 }
 
-const PREFIJO: Record<ObjetoEnFoto['seccion'], string> = {
-  pods: 'pod',
-  nodos: 'nodo',
-  services: 'service',
-  ingress: 'ingress',
-  workloads: 'workload',
-};
-
 /**
  * El objeto que selecciona un clic en el event (id de selección, el mismo del foco y el panel de
  * detalle), o null si el objeto no está en la foto.
  */
 export function seleccionDeEvent(e: EventDelCluster): string | null {
-  return e.enFoto ? `${PREFIJO[e.enFoto.seccion]}:${e.enFoto.id}` : null;
-}
-
-function enFotoDe(d: Detalle): ObjetoEnFoto {
-  switch (d.tipo) {
-    case 'Pod':
-      return { seccion: 'pods', id: d.pod.id };
-    case 'Service':
-      return { seccion: 'services', id: d.service.id };
-    case 'Ingress':
-      return { seccion: 'ingress', id: d.ingress.id };
-    case 'Nodo':
-      return { seccion: 'nodos', id: d.nodo.id };
-    case 'Workload':
-      return { seccion: 'workloads', id: d.workload.id };
-  }
+  return e.enFoto ? idDeObjetoEnFoto(e.enFoto) : null;
 }
 
 /** Los events del objeto del panel de detalle, del más reciente al más viejo. */
 export function eventsDelObjeto(foto: Foto, d: Detalle): EventDelCluster[] {
-  const o = enFotoDe(d);
+  const o = fichaDe(d).enFoto;
   return (foto.events ?? []).filter((e) => e.enFoto?.seccion === o.seccion && e.enFoto.id === o.id).sort(recientesPrimero);
 }
 

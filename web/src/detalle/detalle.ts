@@ -1,8 +1,8 @@
 // Panel de detalle: qué objeto de la foto muestra. El objeto seleccionado se identifica con su id
 // de escena (`pod:<ns>/<nombre>`, `service:…`, `ingress:…`, `nodo:<nombre>`, y un workload de la
 // lista con `workload:<id del workload>`; ver escena/ids.ts). Es la misma selección que da el foco.
-import type { Foto, Ingress, Nodo, Pod, Service, Workload } from '../foto';
-import { partirId } from '../escena/ids';
+import type { Foto, Ingress, Nodo, ObjetoEnFoto, Pod, Service, Workload } from '../foto';
+import { idDeObjetoEnFoto, partirId } from '../escena/ids';
 
 /** El objeto que muestra el panel, ya buscado en la foto. */
 export type Detalle =
@@ -54,19 +54,43 @@ export function detalleDe(foto: Foto, id: string): Detalle | null {
   return null;
 }
 
-/** El objeto como lo pide la API (GET /api/comandos): su tipo de Kubernetes, namespace y nombre. */
-export function objetoDeLaApi(d: Detalle): { tipo: string; namespace: string; nombre: string } {
+/** Lo que cambia según el tipo de objeto del panel. */
+export interface Ficha {
+  /** El objeto como lo pide la API (GET /api/comandos): su tipo de Kubernetes, namespace y nombre. */
+  api: { tipo: string; namespace: string; nombre: string };
+  /** Dónde está en la foto: su lista y su id; así lo referencian los events. */
+  enFoto: ObjetoEnFoto;
+  /** id de escena (el del foco, la selección y las advertencias). */
+  id: string;
+  /** Encabezado del panel: el tipo (`Service · NodePort`, `Deployment`…) y el nombre. */
+  titulo: { tipo: string; nombre: string };
+}
+
+/** La ficha del objeto del panel: el único lugar que distingue cada tipo de objeto. */
+export function fichaDe(d: Detalle): Ficha {
+  const ficha = (api: Ficha['api'], enFoto: ObjetoEnFoto, tituloTipo: string): Ficha => ({
+    api,
+    enFoto,
+    id: idDeObjetoEnFoto(enFoto),
+    titulo: { tipo: tituloTipo, nombre: api.nombre },
+  });
   switch (d.tipo) {
     case 'Pod':
-      return { tipo: 'Pod', namespace: d.pod.namespace, nombre: d.pod.nombre };
-    case 'Service':
-      return { tipo: 'Service', namespace: d.service.namespace, nombre: d.service.nombre };
-    case 'Ingress':
-      return { tipo: 'Ingress', namespace: d.ingress.namespace, nombre: d.ingress.nombre };
+      return ficha({ tipo: 'Pod', namespace: d.pod.namespace, nombre: d.pod.nombre }, { seccion: 'pods', id: d.pod.id }, 'Pod');
+    case 'Service': {
+      const s = d.service;
+      return ficha({ tipo: 'Service', namespace: s.namespace, nombre: s.nombre }, { seccion: 'services', id: s.id }, `Service · ${s.tipo}`);
+    }
+    case 'Ingress': {
+      const i = d.ingress;
+      return ficha({ tipo: 'Ingress', namespace: i.namespace, nombre: i.nombre }, { seccion: 'ingress', id: i.id }, 'Ingress');
+    }
     case 'Nodo':
-      return { tipo: 'Node', namespace: '', nombre: d.nodo.nombre };
-    case 'Workload':
-      return { tipo: d.workload.tipo, namespace: d.workload.namespace, nombre: d.workload.nombre };
+      return ficha({ tipo: 'Node', namespace: '', nombre: d.nodo.nombre }, { seccion: 'nodos', id: d.nodo.id }, 'Nodo');
+    case 'Workload': {
+      const w = d.workload;
+      return ficha({ tipo: w.tipo, namespace: w.namespace, nombre: w.nombre }, { seccion: 'workloads', id: w.id }, w.tipo);
+    }
   }
 }
 
