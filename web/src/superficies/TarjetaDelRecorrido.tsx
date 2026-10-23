@@ -1,6 +1,7 @@
 // Pasos del recorrido (superficie flotante, tarjeta compacta abajo a la izquierda): el destino, la
-// respuesta y los pasos numerados como en la vista. Cerrarla termina el recorrido y el foco vuelve.
-import type { Prueba } from '../prueba';
+// respuesta y los pasos numerados como en la vista; si la request se repitió, las barras del
+// reparto. Cerrarla termina el recorrido y el foco vuelve.
+import type { Prueba, Reparto } from '../prueba';
 import { formatearMs } from './FormularioDePrueba';
 
 export function TarjetaDelRecorrido({ prueba: p, alCerrar }: { prueba: Prueba; alCerrar: () => void }) {
@@ -34,8 +35,37 @@ export function TarjetaDelRecorrido({ prueba: p, alCerrar }: { prueba: Prueba; a
           </li>
         ))}
       </ol>
+      {p.reparto && <BarrasDeReparto reparto={p.reparto} />}
       <div className="tenue-texto chica">Origen: {p.origen}</div>
     </section>
+  );
+}
+
+// reparto de la request repetida: una barra por pod que respondió, y aparte las respuestas sin pod
+// identificado y las requests sin respuesta
+function BarrasDeReparto({ reparto: r }: { reparto: Reparto }) {
+  const fila = (clave: string, nombre: string, n: number, sinPod = false) => (
+    <li key={clave}>
+      <span className={sinPod ? 'reparto-nombre tenue-texto' : 'reparto-nombre'} title={nombre}>
+        {nombre}
+      </span>
+      <span className={sinPod ? 'barra-reparto sin-pod' : 'barra-reparto'}>
+        <span style={{ width: `${(100 * n) / r.total}%` }} />
+      </span>
+      <span className="reparto-n">
+        {n}/{r.total}
+      </span>
+    </li>
+  );
+  return (
+    <div>
+      <b>Reparto</b> <span className="tenue-texto chica">· {r.total} requests</span>
+      <ul className="barras-reparto">
+        {r.pods.map((p) => fila(p.pod, p.pod.slice(p.pod.indexOf('/') + 1), p.n))}
+        {r.sinIdentificar > 0 && fila('?', 'pod sin identificar', r.sinIdentificar, true)}
+        {r.sinRespuesta > 0 && fila('✕', 'sin respuesta', r.sinRespuesta, true)}
+      </ul>
+    </div>
   );
 }
 

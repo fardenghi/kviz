@@ -91,6 +91,13 @@ export async function mandarPrueba(pedido: PedidoDePrueba): Promise<Prueba> {
   return res.json();
 }
 
+/** Historial de las requests de prueba de la sesión (GET /api/pruebas), de la más vieja a la más nueva. Vive en la memoria de kviz. */
+export async function pedirHistorial(): Promise<Prueba[]> {
+  const res = await fetch('/api/pruebas');
+  if (!res.ok) throw new Error(`GET /api/pruebas respondió ${res.status}`);
+  return res.json();
+}
+
 /**
  * Revela el valor de una clave de un Secret (POST /api/secreto). Es el único camino por el que
  * un valor de Secret sale del backend: la foto trae solo las claves.

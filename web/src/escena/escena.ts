@@ -5,7 +5,8 @@ import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWo
 import { type MarcasPod, marcasDePod } from './marcas-pod';
 import { aplicarFoco } from './foco';
 import { aplicarRecorrido } from './recorrido';
-import type { Recorrido } from '../prueba';
+import type { Recorrido, Reparto } from '../prueba';
+import { aplicarReparto } from './reparto';
 import { advertenciasPorObjeto, titulosDe } from './advertencias';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
@@ -37,6 +38,8 @@ export interface EstadoInterfaz {
    * sobre todo lo demás: apaga el foco y atenúa lo que no participa.
    */
   recorrido?: Recorrido | null;
+  /** Reparto de la request de prueba repetida que se está mirando: pastilla `n/N` sobre cada pod (ver reparto.ts). */
+  reparto?: Reparto | null;
 }
 
 export interface Caja {
@@ -95,6 +98,8 @@ export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco, MarcaDeAdver
   bordeWorkload: string | null;
   /** 1, o atenuado cuando hay un workload seleccionado y el pod no es suyo, si es Terminating o por el foco. */
   opacidad: number;
+  /** Pastilla de reparto (`3/8`): cuántas de las requests repetidas respondió este pod; sin valor si ninguna. */
+  reparto?: string;
 }
 
 export interface ServiceEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia, MarcasDeRecorrido {
@@ -395,7 +400,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
   const ancho = Math.max(0, ...cajas.map((c) => c.x + c.ancho));
   const alto = Math.max(0, ...cajas.map((c) => c.y + c.alto));
   const escena = aplicarFoco({ ancho, alto, regiones, pods, services, ingress, puertas, conexiones, foco: null, relacionados: [] }, estado, delWorkload);
-  return aplicarRecorrido(escena, foto, estado);
+  return aplicarReparto(aplicarRecorrido(escena, foto, estado), estado);
 }
 
 const ordenPuertas = (a: Puerta, b: Puerta) =>

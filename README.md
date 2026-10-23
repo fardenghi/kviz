@@ -48,7 +48,7 @@ sirve una página que explica cómo compilarla.
 | `internal/sondeo/` | 10 · pod de sondeo: ciclo de vida en `kviz-system` (`sondeo.go`: se crea con la primera request, huérfanos al conectarse, se borra al cerrar o al cambiar de contexto) y `Ejecutor`, la interfaz "ejecutar y devolver el resultado crudo" (`exec.go`: curl por exec; en los tests, `sondeoDePrueba`) |
 | `internal/trafico/` | 11 · depuración de tráfico, puro: URL del destino, recorrido desde la foto (`Recorrer`) y pod que respondió (`PodQueRespondio`, `ConRespuesta`) |
 | `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto) |
-| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/secreto` en `secreto.go`, `POST /api/pruebas` en `pruebas.go`), canal de streaming (`GET /api/stream`, `stream.go`), logs de un container (`GET /api/logs`, `logs.go`) y costura 1 |
+| `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`, `POST /api/secreto` en `secreto.go`, `POST /api/pruebas` en `pruebas.go`, historial `GET /api/pruebas[/{id}]` en `historial.go`), canal de streaming (`GET /api/stream`, `stream.go`), logs de un container (`GET /api/logs`, `logs.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
 | `web/src/foto.ts` | espejo TypeScript del contrato de la foto |
 | `web/src/tiempoReal.ts` | aplica los mensajes del stream a la foto y recuerda los pods nuevos (brillo) |
@@ -110,3 +110,12 @@ manda la request desde el pod de sondeo y responde `{"id", "url", "origen", "res
 un paso nuevo (DNS, puerta, Ingress, salto) se dibuja sin tocar la escena. El pod de sondeo
 (`curlimages/curl`, en `kviz-system`, con las etiquetas `sondeo.Etiquetas`) es la única escritura de
 kviz en el cluster, además de crear `kviz-system` si no existe.
+
+Con `"repeticiones": N` (1–20) la misma request se manda N veces, una detrás de otra; `respuesta`,
+`error` y el pod del recorrido son los de la primera, y `reparto` (null con una sola) cuenta las
+respuestas por pod con la misma identificación que el recorrido (`trafico.Repartir` sobre
+`PodQueRespondio`): `{"total", "pods": [{"pod", "n"}], "sinIdentificar", "sinRespuesta"}`. La
+escena lo dibuja como pastilla `n/N` sobre cada pod (`escena/reparto.ts`) y la tarjeta del
+recorrido como barras. Cada prueba (con su `contexto`) queda en el historial de la sesión:
+`GET /api/pruebas` las da todas, de la más vieja a la más nueva, y `GET /api/pruebas/{id}` una (404
+si no está). Vive solo en memoria (las últimas 100) y se pierde al cerrar kviz.
