@@ -1,0 +1,50 @@
+/* Estilos de kviz, a mano y sin librería. Paleta y medidas de la variante B del prototipo. */
+:root {
+  --fondo: #f6f7f9;
+  --panel: #ffffff;
+  --linea: #dde1e6;
+  --tinta: #1d2430;
+  --tenue: #8a929c;
+  --ok: #2e9e5b;
+  --mal: #d23b3b;
+  --foco: #2f6fde;
+  --recorrido: #e8458b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: var(--tinta);
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--fondo); }
+
+.app { height: 100%; display: flex; flex-direction: column; }
+
+/* barra de arriba: marca y contexto conectado */
+.barra { display: flex; align-items: center; gap: 14px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--linea); }
+.marca { font-size: 14px; letter-spacing: .02em; }
+.contexto { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 12px; }
+.punto { width: 8px; height: 8px; border-radius: 50%; }
+.punto-conectado { background: var(--ok); }
+.punto-desconectado { background: var(--mal); }
+.tenue-texto { color: var(--tenue); font-family: inherit; }
+.aviso { padding: 24px; color: var(--tenue); }
+
+.boton { font: inherit; font-size: 11.5px; border: 1px solid var(--linea); background: #fff; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+.boton:hover { border-color: #b9c0c8; }
+
+/* lienzo */
+.lienzo { flex: 1; position: relative; overflow: hidden; background: var(--fondo); cursor: grab; }
+.lienzo:active { cursor: grabbing; }
+.lienzo-svg { width: 100%; height: 100%; display: block; user-select: none; }
+.flotante { position: absolute; background: #fff; border: 1px solid #e3e6ea; border-radius: 10px; box-shadow: 0 2px 10px rgba(20, 30, 50, .06); cursor: default; }
+.zoom { right: 12px; bottom: 12px; display: flex; gap: 4px; padding: 4px; }
+
+/* escena */
+.mono { font-family: var(--mono); font-size: 10.5px; }
+.tenue { fill: var(--tenue); }
+.region { fill: #fff; stroke: #dfe3e8; stroke-width: 1.5; }
+.region-sin-nodo { fill: transparent; stroke-dasharray: 6 5; }
+.region-titulo { font-size: 14px; font-weight: 700; fill: var(--tinta); }
+.pod { fill: #fff; stroke: #d5dae0; stroke-width: 1.2; }
+.pod-nombre { font-size: 11.5px; font-weight: 600; fill: var(--tinta); }

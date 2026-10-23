@@ -1,0 +1,5 @@
+/bin/
+/web/node_modules/
+# build de Vite: se incluye en el binario, no se commitea (salvo el .gitkeep que deja compilar Go)
+/web/dist/*
+!/web/dist/.gitkeep
