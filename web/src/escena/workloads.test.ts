@@ -39,6 +39,7 @@ const COREDNS = 'Deployment/kube-system/coredns';
 const lab = (): Foto => ({
   contexto: 'kind-lab',
   conectado: true,
+  services: [],
   nodos: [
     { nombre: 'lab-worker', internalIP: '172.23.0.4' },
     { nombre: 'lab-worker2', internalIP: '172.23.0.3' },

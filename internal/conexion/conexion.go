@@ -19,6 +19,7 @@ import (
 	listersappsv1 "k8s.io/client-go/listers/apps/v1"
 	listersbatchv1 "k8s.io/client-go/listers/batch/v1"
 	listerscorev1 "k8s.io/client-go/listers/core/v1"
+	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"kviz/internal/foto"
@@ -40,6 +41,8 @@ type Conexion struct {
 	daemonSets   listersappsv1.DaemonSetLister
 	jobs         listersbatchv1.JobLister
 	cronJobs     listersbatchv1.CronJobLister
+	services     listerscorev1.ServiceLister
+	slices       listersdiscoveryv1.EndpointSliceLister
 }
 
 // Nueva arma una conexión sobre un cliente ya creado. En producción el cliente sale de
@@ -91,6 +94,11 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	pods := fabrica.Core().V1().Pods()
 	c.nodos = nodos.Lister()
 	c.pods = pods.Lister()
+	services := fabrica.Core().V1().Services()
+	slices := fabrica.Discovery().V1().EndpointSlices()
+	c.services = services.Lister()
+	c.slices = slices.Lister()
+
 	apps, batch := fabrica.Apps().V1(), fabrica.Batch().V1()
 	c.deployments = apps.Deployments().Lister()
 	c.replicaSets = apps.ReplicaSets().Lister()
@@ -117,7 +125,9 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 func (c *Conexion) Objetos() foto.Objetos {
 	nodos, _ := c.nodos.List(labels.Everything())
 	pods, _ := c.pods.List(labels.Everything())
-	o := foto.Objetos{Nodos: nodos, Pods: pods}
+	services, _ := c.services.List(labels.Everything())
+	slices, _ := c.slices.List(labels.Everything())
+	o := foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices}
 	o.Deployments, _ = c.deployments.List(labels.Everything())
 	o.ReplicaSets, _ = c.replicaSets.List(labels.Everything())
 	o.StatefulSets, _ = c.statefulSets.List(labels.Everything())

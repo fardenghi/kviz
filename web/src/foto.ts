@@ -14,6 +14,8 @@ export interface Foto {
   pods: Pod[];
   /** Workloads de arriba de cada cadena de dueños, ordenados por namespace y nombre. */
   workloads: Workload[];
+  /** Ordenados por namespace y nombre. */
+  services: Service[];
 }
 
 export interface Nodo {
@@ -61,4 +63,36 @@ export interface Eslabon {
   nombre: string;
   /** Nombres de sus pods (mismo namespace que el workload). */
   pods: string[];
+}
+
+export interface Service {
+  nombre: string;
+  namespace: string;
+  /** spec.type: ClusterIP, NodePort, LoadBalancer o ExternalName. */
+  tipo: string;
+  /** "None" en un Service headless; "" si no tiene (ExternalName). */
+  clusterIP: string;
+  puertos: PuertoService[];
+  selector: Record<string, string>;
+  /** Endpoints listos y no listos, de las EndpointSlices del Service; ordenados por IP. */
+  endpoints: Endpoint[];
+}
+
+export interface PuertoService {
+  nombre: string;
+  protocolo: string;
+  puerto: number;
+  /** Número, o el nombre de un puerto de los containers. */
+  targetPort: number | string;
+  /** Solo si el Service abre un puerto en cada nodo. */
+  nodePort?: number;
+}
+
+export interface Endpoint {
+  ip: string;
+  /** Nombre del pod (en el namespace del Service) detrás del endpoint, si se sabe. */
+  pod: string | null;
+  nodo: string | null;
+  /** conditions.ready de la EndpointSlice. */
+  listo: boolean;
 }

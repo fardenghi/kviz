@@ -212,8 +212,6 @@ func podDe(dueno metav1.Object, nombre, nodo string) *corev1.Pod {
 	return p
 }
 
-func ptrBool(b bool) *bool { return &b }
-
 func ptr(s string) *string { return &s }
 
 // mostrar imprime un valor como JSON, para que los mensajes de error muestren los punteros.

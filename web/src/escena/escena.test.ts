@@ -19,6 +19,7 @@ const foto = (parte: Partial<Foto>): Foto => ({
   nodos: [],
   pods: [],
   workloads: [],
+  services: [],
   ...parte,
 });
 
