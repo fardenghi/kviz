@@ -108,7 +108,10 @@ Think about this before pointing kviz at a cluster that is not a test cluster.
 ## Security
 
 kviz listens **only on `127.0.0.1`**, never on other interfaces, so nobody else on your network can
-see your Secrets or send requests into your cluster through it. The history of test requests lives
+see your Secrets or send requests into your cluster through it. It also answers only requests
+addressed to `localhost`/`127.0.0.1` (so a site that points its domain at your machine, a DNS
+rebinding attack, can't read it), rejects state-changing requests coming from another origin, and
+requires JSON bodies on its POSTs, so other pages open in your browser can't use it either. The history of test requests lives
 only in memory and is lost when kviz exits.
 
 ## Documentation

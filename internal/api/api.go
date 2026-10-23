@@ -49,6 +49,7 @@ type Cluster interface {
 }
 
 // Nuevo arma el handler HTTP de kviz. ui sirve la interfaz (web.Handler); si es nil no se sirve.
+// Solo atiende pedidos a localhost, del mismo origen y, los POST, con cuerpo JSON (ver soloLocalhost).
 func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/foto", func(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +76,7 @@ func Nuevo(cluster Cluster, ui http.Handler) http.Handler {
 	if ui != nil {
 		mux.Handle("GET /", ui)
 	}
-	return mux
+	return soloLocalhost(mux)
 }
 
 func responderJSON(w http.ResponseWriter, v any) {

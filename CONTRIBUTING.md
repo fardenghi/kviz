@@ -86,6 +86,15 @@ id: that way the stream sends only the objects that changed without new code.
 
 ## API notes
 
+### Localhost only
+
+`api.Nuevo` wraps every route in `soloLocalhost` (`internal/api/localhost.go`): a request whose
+`Host` isn't `localhost`, `127.0.0.1` or `[::1]` (any port) gets 403, which stops DNS rebinding; a
+`POST` from another origin gets 403 (`http.CrossOriginProtection`: `Sec-Fetch-Site`, or `Origin`
+against `Host`); and a `POST` without `Content-Type: application/json` gets 415. The Vite dev
+proxy keeps the browser's `Host` (`localhost:5173`) and the page's `Origin`, so `npm run dev`
+passes these checks; don't set `changeOrigin` on it.
+
 ### Real time
 
 `GET /api/stream` is a Server-Sent Events stream. Each message is `data: <JSON>` with a `tipo`
