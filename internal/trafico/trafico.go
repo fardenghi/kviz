@@ -23,6 +23,8 @@ import (
 type Recorrido struct {
 	// Pasos en orden, numerados desde 1. Vacío si el destino no es un objeto de la foto.
 	Pasos []Paso `json:"pasos"`
+	// sondeo es el nodo del pod de sondeo, de donde sale la request (ver DesdeNodo); "" si no se sabe.
+	sondeo string
 }
 
 // Tipos de paso.

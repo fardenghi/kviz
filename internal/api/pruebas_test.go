@@ -132,7 +132,10 @@ func TestElRecorridoAUnNombreDNSVaDelDNSAlServiceASusEndpointsYAlPodQueRespondio
 			Objetos: []refJSON{{Tipo: "service", ID: "default/backend"}}},
 		{N: 3, Tipo: "endpoints", Titulo: "10.244.1.5:8081, 10.244.2.4:8081", Detalle: "2 endpoints listos; kube-proxy elige uno",
 			Objetos: []refJSON{{Tipo: "pod", ID: "default/" + podK2x8p}, {Tipo: "pod", ID: "default/" + pod7hw4q}}},
-		{N: 4, Tipo: "pod", Titulo: podK2x8p + " 10.244.1.5", Detalle: "Conocido: el body de la respuesta trae el nombre del pod",
+		// la request sale del pod de sondeo, en lab-control-plane: ese es el nodo de entrada
+		{N: 4, Tipo: "salto", Titulo: "lab-control-plane → lab-worker", Detalle: "El paquete sale del nodo del pod de sondeo (172.23.0.2) hacia 172.23.0.4, donde corre el pod",
+			Objetos: []refJSON{{Tipo: "nodo", ID: "lab-control-plane"}, {Tipo: "nodo", ID: "lab-worker"}}},
+		{N: 5, Tipo: "pod", Titulo: podK2x8p + " 10.244.1.5", Detalle: "Conocido: el body de la respuesta trae el nombre del pod",
 			Objetos: []refJSON{{Tipo: "pod", ID: "default/" + podK2x8p}}},
 	}
 	if !reflect.DeepEqual(got.Recorrido.Pasos, want) {

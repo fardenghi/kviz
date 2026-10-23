@@ -2,7 +2,8 @@ package trafico
 
 // Qué pod respondió, solo cuando kviz lo puede saber: porque el body trae el nombre de un pod de
 // los endpoints, o porque el log del Ingress Controller dice a qué endpoint mandó la request. Con
-// el pod se suman el salto entre nodos (si el pod está en otro nodo que el de entrada) y el paso pod.
+// el pod se suman el salto entre nodos (si el pod está en otro nodo que el de entrada: el de la
+// puerta, el del Ingress Controller o, si no, el del pod de sondeo) y el paso pod.
 
 import (
 	"fmt"
@@ -70,16 +71,7 @@ func ConRespuesta(f foto.Foto, r Recorrido, resp Respuesta) Recorrido {
 }
 
 func conPod(f foto.Foto, r Recorrido, p *foto.Pod, como string) Recorrido {
-	if desde := nodoDeEntrada(f, r); desde != nil && p.Nodo != nil && *p.Nodo != desde.Nombre {
-		if hasta := nodoPorNombre(f, *p.Nodo); hasta != nil {
-			r = r.con(Paso{
-				Tipo:    PasoSalto,
-				Titulo:  desde.Nombre + " → " + hasta.Nombre,
-				Detalle: fmt.Sprintf("El paquete sale del nodo %s hacia %s, donde corre el pod", desde.InternalIP, hasta.InternalIP),
-				Objetos: []Ref{refNodo(desde.Nombre), refNodo(hasta.Nombre)},
-			})
-		}
-	}
+	r = r.conSalto(f, p)
 	ip := "sin IP"
 	if p.IP != nil {
 		ip = *p.IP
@@ -87,20 +79,45 @@ func conPod(f foto.Foto, r Recorrido, p *foto.Pod, como string) Recorrido {
 	return r.con(Paso{Tipo: PasoPod, Titulo: p.Nombre + " " + ip, Detalle: como, Objetos: []Ref{refPod(p)}})
 }
 
+// conSalto suma el salto entre nodos si el pod corre en otro nodo que el de entrada.
+func (r Recorrido) conSalto(f foto.Foto, p *foto.Pod) Recorrido {
+	desde, delSondeo := nodoDeEntrada(f, r)
+	if desde == nil || p.Nodo == nil || *p.Nodo == desde.Nombre {
+		return r
+	}
+	hasta := nodoPorNombre(f, *p.Nodo)
+	if hasta == nil {
+		return r
+	}
+	sale := "del nodo " + desde.InternalIP
+	if delSondeo {
+		sale = fmt.Sprintf("del nodo del pod de sondeo (%s)", desde.InternalIP)
+	}
+	return r.con(Paso{
+		Tipo:    PasoSalto,
+		Titulo:  desde.Nombre + " → " + hasta.Nombre,
+		Detalle: fmt.Sprintf("El paquete sale %s hacia %s, donde corre el pod", sale, hasta.InternalIP),
+		Objetos: []Ref{refNodo(desde.Nombre), refNodo(hasta.Nombre)},
+	})
+}
+
 // nodoDeEntrada es el nodo desde el que sale la request hacia el pod: el del Ingress Controller
-// que la mandó, o el de la puerta por la que entró. nil si no se sabe (un Service por ClusterIP
-// sale del nodo del pod de sondeo, que la vista no muestra).
-func nodoDeEntrada(f foto.Foto, r Recorrido) *foto.Nodo {
-	var nodo *foto.Nodo
+// que la mandó, o el de la puerta por la que entró; si no pasó por ninguno (un Service por nombre o
+// ClusterIP, la IP de un pod), el del pod de sondeo, y entonces delSondeo es true. nil si no se
+// sabe (varios pods del Ingress Controller, por ejemplo).
+func nodoDeEntrada(f foto.Foto, r Recorrido) (nodo *foto.Nodo, delSondeo bool) {
+	directo := true
 	for _, paso := range r.Pasos {
 		switch paso.Tipo {
 		case PasoPuerta:
+			directo = false
 			for _, o := range paso.Objetos {
 				if pu := puertaPorID(f, o.ID); o.Tipo == "puerta" && pu != nil {
 					nodo = nodoPorNombre(f, pu.Nodo)
 				}
 			}
 		case PasoIngress:
+			directo = false
 			if ics := PodsDelIngressController(Recorrido{Pasos: []Paso{paso}}); len(ics) == 1 {
 				if p := podDe(f, ics[0].ID); p != nil && p.Nodo != nil {
 					nodo = nodoPorNombre(f, *p.Nodo)
@@ -108,7 +125,10 @@ func nodoDeEntrada(f foto.Foto, r Recorrido) *foto.Nodo {
 			}
 		}
 	}
-	return nodo
+	if directo && r.sondeo != "" {
+		return nodoPorNombre(f, r.sondeo), true
+	}
+	return nodo, false
 }
 
 // PodsDelIngressController son los pods del Ingress Controller por los que pasa el recorrido: los

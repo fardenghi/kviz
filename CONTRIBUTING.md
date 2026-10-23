@@ -143,7 +143,9 @@ door's port: a NodePort, or the Ingress Controller's hostPort (an Ingress route:
 with path `/backend/hello`). The path is DNS (if the target is a name) → door → Ingress rule with the
 rewritten path → Service → endpoints, and it adds the hop between nodes and the pod only when kviz
 knows which pod answered: because the body carries its name, or because the Ingress Controller log
-says so. For that, kviz adds `X-Request-ID: kviz-…` to a request that goes through the Ingress
+says so. The hop starts at the entry node: the door's node, the Ingress Controller pod's node, or,
+for a request that goes through neither (a Service by name or ClusterIP, a pod IP), the probe pod's
+node (`trafico.DesdeNodo`); a pod IP target gets the hop straight away. For that, kviz adds `X-Request-ID: kviz-…` to a request that goes through the Ingress
 Controller (if the request doesn't carry one); ingress-nginx writes it at the end of each log line
 (`$req_id`), and kviz then reads the last lines of the controller's log (`GET /api/logs` uses the
 same `Cluster.Logs`, here without following) to get `$upstream_addr`. A TCP connection test doesn't

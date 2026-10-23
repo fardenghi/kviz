@@ -144,11 +144,24 @@ func TestUnaIPDePodVaDirectoAlPod(t *testing.T) {
 	_, got := kviz.mandarPrueba(t, pedidoDePrueba{Destino: "10.244.1.5:8081", Path: "/hello"})
 
 	want := []pasoJSON{
-		{N: 1, Tipo: "pod", Titulo: podK2x8p + " 10.244.1.5:8081", Detalle: "IP de un pod: la request va directo al pod, sin Service ni kube-proxy",
+		{N: 1, Tipo: "salto", Titulo: "lab-control-plane → lab-worker", Detalle: "El paquete sale del nodo del pod de sondeo (172.23.0.2) hacia 172.23.0.4, donde corre el pod",
+			Objetos: []refJSON{{Tipo: "nodo", ID: "lab-control-plane"}, {Tipo: "nodo", ID: "lab-worker"}}},
+		{N: 2, Tipo: "pod", Titulo: podK2x8p + " 10.244.1.5:8081", Detalle: "IP de un pod: la request va directo al pod, sin Service ni kube-proxy",
 			Objetos: []refJSON{{Tipo: "pod", ID: "default/" + podK2x8p}}},
 	}
 	if !reflect.DeepEqual(got.Recorrido.Pasos, want) {
 		t.Fatalf("recorrido = %s\nwant %s", mostrar(got.Recorrido.Pasos), mostrar(want))
+	}
+}
+
+func TestUnPodEnElNodoDelPodDeSondeoNoTieneSalto(t *testing.T) {
+	// el pod de sondeo corre en lab-control-plane
+	kviz := nuevoKviz(t, "kind-lab", append(clusterDeLaGuia(), pod("default", "vecino", "lab-control-plane", "10.244.0.20", corev1.PodRunning))...)
+
+	_, got := kviz.mandarPrueba(t, pedidoDePrueba{Destino: "10.244.0.20:8080"})
+
+	if tipos := tiposDePasos(got); !reflect.DeepEqual(tipos, []string{"pod"}) {
+		t.Fatalf("pasos = %s, want solo el pod, sin salto", mostrar(got.Recorrido.Pasos))
 	}
 }
 

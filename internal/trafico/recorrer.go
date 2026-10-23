@@ -17,6 +17,8 @@ type Opcion func(*opciones)
 type opciones struct {
 	// host es el header Host de la request: elige la regla de Ingress.
 	host string
+	// sondeo es el nodo del pod de sondeo.
+	sondeo string
 }
 
 // ConHost dice el header Host que lleva la request, si el pedido lo pone; si no, vale el host de
@@ -27,6 +29,13 @@ func ConHost(host string) Opcion {
 			o.host = host
 		}
 	}
+}
+
+// DesdeNodo dice en qué nodo corre el pod de sondeo del que sale la request: es el nodo de
+// entrada cuando la request no entra por una puerta ni por el Ingress Controller (un Service por
+// nombre o ClusterIP, la IP de un pod), y de ahí sale el salto hacia el nodo del pod.
+func DesdeNodo(nodo string) Opcion {
+	return func(o *opciones) { o.sondeo = nodo }
 }
 
 // Recorrer calcula el recorrido de una request a la URL según la foto. El destino puede ser:
@@ -43,7 +52,7 @@ func Recorrer(f foto.Foto, u *url.URL, ops ...Opcion) Recorrido {
 	for _, op := range ops {
 		op(&o)
 	}
-	c := calculo{f: f, http: u.Scheme != "tcp", host: o.host, path: u.EscapedPath(), r: Recorrido{Pasos: []Paso{}}}
+	c := calculo{f: f, http: u.Scheme != "tcp", host: o.host, path: u.EscapedPath(), r: Recorrido{Pasos: []Paso{}, sondeo: o.sondeo}}
 	if c.path == "" {
 		c.path = "/"
 	}
@@ -61,6 +70,7 @@ func Recorrer(f foto.Foto, u *url.URL, ops ...Opcion) Recorrido {
 		}
 		c.desdeNodo(n, puerto)
 	} else if p := podPorIP(f, host); p != nil && esIP {
+		c.r = c.r.conSalto(f, p)
 		c.con(Paso{Tipo: PasoPod, Titulo: fmt.Sprintf("%s %s:%d", p.Nombre, host, puerto),
 			Detalle: "IP de un pod: la request va directo al pod, sin Service ni kube-proxy", Objetos: []Ref{refPod(p)}})
 	}

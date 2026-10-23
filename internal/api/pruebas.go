@@ -180,7 +180,7 @@ func mandarPrueba(cluster Cluster, h *historial) http.HandlerFunc {
 
 		// el recorrido se calcula con la foto de después de la request: la más cercana a la respuesta
 		f := cluster.Foto()
-		recorrido := trafico.Recorrer(f, u, host)
+		recorrido := trafico.Recorrer(f, u, host, trafico.DesdeNodo(pod.Nodo))
 		if porIC && len(respuestas) > 0 {
 			upstreams := upstreamsDelIngressController(ctx, cluster, f, recorrido, ids)
 			for i := range respuestas {

@@ -62,7 +62,7 @@ func mandarConexion(w http.ResponseWriter, r *http.Request, cluster Cluster, h *
 		Tipo:         p.Tipo,
 		URL:          u.String(),
 		Origen:       origen(pod),
-		Recorrido:    trafico.Recorrer(f, u),
+		Recorrido:    trafico.Recorrer(f, u, trafico.DesdeNodo(pod.Nodo)),
 		Contexto:     f.Contexto,
 		Repeticiones: 1,
 	}
