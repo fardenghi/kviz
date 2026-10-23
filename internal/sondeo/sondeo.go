@@ -93,15 +93,18 @@ type PedidoTCP struct {
 	Puerto int32
 }
 
+// ResultadoDeConexion es cómo terminó una prueba de conexión.
+type ResultadoDeConexion string
+
 // Resultados de una prueba de conexión.
 const (
 	// Abre: el puerto aceptó la conexión.
-	Abre = "abre"
+	Abre ResultadoDeConexion = "abre"
 	// Rechaza: el destino respondió que no (RST: nadie escucha en el puerto) o no hay ruta.
-	Rechaza = "rechaza"
+	Rechaza ResultadoDeConexion = "rechaza"
 	// Timeout: nadie respondió dentro de EsperaConexion (un firewall o una NetworkPolicy que
 	// descarta, una IP que no existe).
-	Timeout = "timeout"
+	Timeout ResultadoDeConexion = "timeout"
 )
 
 // EsperaConexion es el tiempo máximo para que se abra la conexión de una prueba de conexión.
@@ -110,7 +113,7 @@ const EsperaConexion = 5 * time.Second
 // ResultadoTCP es el resultado crudo de una prueba de conexión.
 type ResultadoTCP struct {
 	// Resultado es Abre, Rechaza o Timeout.
-	Resultado string
+	Resultado ResultadoDeConexion
 	// Duracion es lo que tardó en abrirse, en ser rechazada o en vencer la conexión, medido adentro
 	// del pod de sondeo.
 	Duracion time.Duration

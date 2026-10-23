@@ -27,22 +27,37 @@ type Recorrido struct {
 	sondeo string
 }
 
+// TipoDePaso dice qué es un paso del recorrido.
+type TipoDePaso string
+
 // Tipos de paso.
 const (
-	PasoDNS       = "dns"
-	PasoPuerta    = "puerta"
-	PasoIngress   = "ingress"
-	PasoService   = "service"
-	PasoEndpoints = "endpoints"
-	PasoSalto     = "salto"
-	PasoPod       = "pod"
+	PasoDNS       TipoDePaso = "dns"
+	PasoPuerta    TipoDePaso = "puerta"
+	PasoIngress   TipoDePaso = "ingress"
+	PasoService   TipoDePaso = "service"
+	PasoEndpoints TipoDePaso = "endpoints"
+	PasoSalto     TipoDePaso = "salto"
+	PasoPod       TipoDePaso = "pod"
+)
+
+// TipoDeRef dice en qué lista de la foto está el objeto que marca un paso.
+type TipoDeRef string
+
+// Tipos de objeto que marca un paso.
+const (
+	RefNodo    TipoDeRef = "nodo"
+	RefPod     TipoDeRef = "pod"
+	RefService TipoDeRef = "service"
+	RefIngress TipoDeRef = "ingress"
+	RefPuerta  TipoDeRef = "puerta"
 )
 
 // Paso es un paso del recorrido.
 type Paso struct {
 	N int `json:"n"`
 	// Tipo: dns, puerta, ingress, service, endpoints, salto o pod (ver las constantes Paso…).
-	Tipo string `json:"tipo"`
+	Tipo TipoDePaso `json:"tipo"`
 	// Titulo es la línea principal del paso: `backend 10.96.11.121:80 → :8081`.
 	Titulo string `json:"titulo"`
 	// Detalle explica el paso en español.
@@ -56,8 +71,8 @@ type Paso struct {
 // para una puerta; el nombre para un nodo). El paso salto marca dos nodos: de dónde sale y a dónde
 // llega, en ese orden.
 type Ref struct {
-	Tipo string `json:"tipo"`
-	ID   string `json:"id"`
+	Tipo TipoDeRef `json:"tipo"`
+	ID   string    `json:"id"`
 }
 
 // URL arma la URL de una request de prueba: destino es `host[:puerto]` o una URL (con o sin

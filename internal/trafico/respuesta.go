@@ -112,7 +112,7 @@ func nodoDeEntrada(f foto.Foto, r Recorrido) (nodo *foto.Nodo, delSondeo bool) {
 		case PasoPuerta:
 			directo = false
 			for _, o := range paso.Objetos {
-				if pu := puertaPorID(f, o.ID); o.Tipo == "puerta" && pu != nil {
+				if pu := puertaPorID(f, o.ID); o.Tipo == RefPuerta && pu != nil {
 					nodo = nodoPorNombre(f, pu.Nodo)
 				}
 			}
@@ -140,7 +140,7 @@ func PodsDelIngressController(r Recorrido) []Ref {
 			continue
 		}
 		for _, o := range paso.Objetos {
-			if o.Tipo == "pod" {
+			if o.Tipo == RefPod {
 				out = append(out, o)
 			}
 		}

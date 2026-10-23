@@ -121,7 +121,7 @@ func (c *calculo) desdeNodo(n *foto.Nodo, puerto int32) {
 			Objetos: []Ref{refNodo(n.Nombre)}})
 		return
 	}
-	paso := Paso{Tipo: PasoPuerta, Titulo: fmt.Sprintf("%s :%d (%s)", n.Nombre, puerto, pu.Tipo), Objetos: []Ref{{Tipo: "puerta", ID: pu.ID}}}
+	paso := Paso{Tipo: PasoPuerta, Titulo: fmt.Sprintf("%s :%d (%s)", n.Nombre, puerto, pu.Tipo), Objetos: []Ref{refPuerta(pu)}}
 	if pu.Service != nil {
 		s := serviceDe(c.f, *pu.Service+"."+pu.Namespace)
 		paso.Detalle = fmt.Sprintf("kube-proxy del nodo la manda al Service %s", *pu.Service)
@@ -188,7 +188,7 @@ func (c *calculo) desdeService(s *foto.Service, puerto intstr.IntOrString, ics [
 		}
 		direcciones = append(direcciones, e.IP+":"+p.TargetPort.String())
 		if e.Pod != nil {
-			pods = append(pods, Ref{Tipo: "pod", ID: s.Namespace + "/" + *e.Pod})
+			pods = append(pods, Ref{Tipo: RefPod, ID: s.Namespace + "/" + *e.Pod})
 			if pod := podDe(c.f, s.Namespace+"/"+*e.Pod); pod != nil {
 				listos = append(listos, pod)
 			}
@@ -279,10 +279,11 @@ func esIngressController(p *foto.Pod) bool {
 	return false
 }
 
-func refNodo(nombre string) Ref      { return Ref{Tipo: "nodo", ID: nombre} }
-func refPod(p *foto.Pod) Ref         { return Ref{Tipo: "pod", ID: p.ID} }
-func refService(s *foto.Service) Ref { return Ref{Tipo: "service", ID: s.ID} }
-func refIngress(i *foto.Ingress) Ref { return Ref{Tipo: "ingress", ID: i.ID} }
+func refNodo(nombre string) Ref      { return Ref{Tipo: RefNodo, ID: nombre} }
+func refPod(p *foto.Pod) Ref         { return Ref{Tipo: RefPod, ID: p.ID} }
+func refService(s *foto.Service) Ref { return Ref{Tipo: RefService, ID: s.ID} }
+func refIngress(i *foto.Ingress) Ref { return Ref{Tipo: RefIngress, ID: i.ID} }
+func refPuerta(p *foto.Puerta) Ref   { return Ref{Tipo: RefPuerta, ID: p.ID} }
 
 func deref(s *string) string {
 	if s == nil {

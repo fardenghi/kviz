@@ -19,8 +19,8 @@ import (
 
 // conexionTCP es el resultado de una prueba de conexión, en el campo `conexion` de la prueba.
 type conexionTCP struct {
-	// Resultado es "abre", "rechaza" o "timeout".
-	Resultado string `json:"resultado"`
+	// Resultado es "abre", "rechaza" o "timeout" (sondeo.Abre, Rechaza o Timeout).
+	Resultado sondeo.ResultadoDeConexion `json:"resultado"`
 	// Ms es lo que tardó en abrirse, en ser rechazada o en vencer, medido en el pod de sondeo.
 	Ms float64 `json:"ms"`
 	// Motivo es el mensaje del pod de sondeo cuando no abre.

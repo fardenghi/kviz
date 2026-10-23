@@ -27,10 +27,18 @@ import (
 	"github.com/fardenghi/kviz/internal/trafico"
 )
 
+// tipoDePrueba es "http" (una request de prueba) o "tcp" (una prueba de conexión, ver conexion.go).
+type tipoDePrueba string
+
+const (
+	pruebaHTTP tipoDePrueba = "http"
+	pruebaTCP  tipoDePrueba = "tcp"
+)
+
 // pedidoDePrueba es el cuerpo de POST /api/pruebas.
 type pedidoDePrueba struct {
-	// Tipo es "http" (por defecto) o "tcp" (prueba de conexión, ver conexion.go: solo usa Destino).
-	Tipo string `json:"tipo"`
+	// Tipo es pruebaHTTP (por defecto) o pruebaTCP (solo usa Destino).
+	Tipo tipoDePrueba `json:"tipo"`
 	// Destino es `host[:puerto]` o una URL: `backend.default.svc.cluster.local:80`, `10.96.11.121`,
 	// `http://backend.default/hello`. En una prueba de conexión, `host:puerto`.
 	Destino string `json:"destino"`
@@ -51,8 +59,8 @@ const maxRepeticiones = 20
 // prueba es la respuesta de POST /api/pruebas: una request de prueba ya ejecutada.
 type prueba struct {
 	// ID numera las pruebas de la sesión (1, 2, …).
-	ID   int    `json:"id"`
-	Tipo string `json:"tipo"`
+	ID   int          `json:"id"`
+	Tipo tipoDePrueba `json:"tipo"`
 	// URL es la que ejecutó el pod de sondeo.
 	URL    string `json:"url"`
 	Metodo string `json:"metodo"`
@@ -97,13 +105,13 @@ func mandarPrueba(cluster Cluster, h *historial) http.HandlerFunc {
 			return
 		}
 		if p.Tipo == "" {
-			p.Tipo = "http"
+			p.Tipo = pruebaHTTP
 		}
-		if p.Tipo == "tcp" {
+		if p.Tipo == pruebaTCP {
 			mandarConexion(w, r, cluster, h, p)
 			return
 		}
-		if p.Tipo != "http" {
+		if p.Tipo != pruebaHTTP {
 			http.Error(w, fmt.Sprintf("tipo de prueba desconocido: %q", p.Tipo), http.StatusBadRequest)
 			return
 		}
@@ -275,7 +283,7 @@ func pedidoDeLogDelIC(f foto.Foto, id string) (conexion.PedidoDeLogs, bool) {
 			continue
 		}
 		for _, c := range p.Containers {
-			if c.Tipo == "normal" {
+			if c.Tipo == foto.ContainerNormal {
 				return conexion.PedidoDeLogs{Namespace: p.Namespace, Pod: p.Nombre, Container: c.Nombre, SinSeguir: true, Ultimas: 200}, true
 			}
 		}
