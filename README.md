@@ -44,6 +44,7 @@ sirve una página que explica cómo compilarla.
 | `cmd/kviz/` | arranque: puerto en 127.0.0.1, navegador, señales |
 | `internal/conexion/` | 1 · conexión al cluster: `gestor.go` (contexto elegido, cambio en caliente, vigilancia y reconexión), `kubeconfig.go` (contextos y clientes del kubeconfig), `conexion.go` (informers de un cluster) |
 | `internal/foto/` | 2 · modelo del cluster: objetos de Kubernetes → foto (contrato JSON); `workloads.go`: cadenas de dueños y color por workload; `cambios.go`: los cambios de la foto para el stream; `detalle.go` y `rollout.go`: lo que solo usa el panel de detalle |
+| `internal/advertencias/` | 6 · advertencias de configuración: las seis reglas de las historias 70–75, puras sobre la foto (y los objetos de los que sale), con explicación y comando sugerido; viajan en `foto.advertencias` |
 | `internal/comandos/` | 7 · comandos sugeridos: generador puro de objeto de la foto a comandos de kubectl (con nombre, namespace y contexto) |
 | `internal/api/` | 12 · API HTTP (`GET /api/foto`, `GET /api/contextos`, `POST /api/contexto`, `GET /api/comandos`), canal de streaming (`GET /api/stream`, `stream.go`) y costura 1 |
 | `web/ui.go` | la interfaz compilada (`web/dist`) embebida en el binario |
