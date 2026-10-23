@@ -57,7 +57,12 @@ func main() {
 	url := "http://" + ln.Addr().String()
 	fmt.Printf("kviz escuchando en %s\n", url)
 
-	srv := &http.Server{Handler: api.Nuevo(c, web.Handler()), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{
+		Handler:           api.Nuevo(c, web.Handler()),
+		ReadHeaderTimeout: 10 * time.Second,
+		// los pedidos heredan ctx: al apagar kviz se cortan los streams abiertos
+		BaseContext: func(net.Listener) context.Context { return ctx },
+	}
 	go func() {
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)

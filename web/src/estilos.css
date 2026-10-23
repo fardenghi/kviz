@@ -48,3 +48,9 @@ body { background: var(--fondo); }
 .region-titulo { font-size: 14px; font-weight: 700; fill: var(--tinta); }
 .pod { fill: #fff; stroke: #d5dae0; stroke-width: 1.2; }
 .pod-nombre { font-size: 11.5px; font-weight: 600; fill: var(--tinta); }
+
+/* tiempo real: el pod nuevo brilla 3 veces (la animación la pone el lienzo); el Terminating se atenúa */
+.pod-nuevo { stroke: var(--ok); stroke-width: 1.8; }
+@keyframes brillo { 50% { stroke-width: 4; stroke-opacity: .5; } }
+.pod-terminando { opacity: .4; }
+.pod-terminando .pod { stroke-dasharray: 4 3; }

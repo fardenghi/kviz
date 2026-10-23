@@ -4,8 +4,9 @@
 // kviz nunca se cae por no poder conectarse: sin contexto, o mientras el cluster no responde,
 // la conexión entrega una foto desconectada con el motivo.
 //
-// Para observar un tipo de objeto nuevo: registrar su informer en Iniciar y copiar sus objetos
-// en Objetos (y sumarlos a foto.Objetos).
+// Para observar un tipo de objeto nuevo: registrar su informer en Iniciar (con el handler de
+// avisos, para que sus cambios lleguen en vivo) y copiar sus objetos en Objetos (y sumarlos a
+// foto.Objetos).
 package conexion
 
 import (
@@ -31,6 +32,7 @@ type Conexion struct {
 	motivo  string
 
 	sincronizada atomic.Bool
+	avisos       avisos
 	nodos        listerscorev1.NodeLister
 	pods         listerscorev1.PodLister
 }
@@ -84,12 +86,18 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	pods := fabrica.Core().V1().Pods()
 	c.nodos = nodos.Lister()
 	c.pods = pods.Lister()
+	for _, inf := range []cache.SharedIndexInformer{nodos.Informer(), pods.Informer()} {
+		if _, err := inf.AddEventHandler(c.avisos.alCambiar()); err != nil {
+			return err
+		}
+	}
 
 	fabrica.Start(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), nodos.Informer().HasSynced, pods.Informer().HasSynced) {
 		return fmt.Errorf("no se pudo sincronizar con el cluster %q", c.contexto)
 	}
 	c.sincronizada.Store(true)
+	c.avisos.avisar()
 	return nil
 }
 

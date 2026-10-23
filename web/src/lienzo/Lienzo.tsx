@@ -2,6 +2,7 @@
 // encuadrar. No decide nada sobre el cluster: todo lo que dibuja viene de la escena.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Escena, PodEnEscena, RegionEnEscena } from '../escena/escena';
+import { BRILLO_POD_NUEVO } from '../tiempoReal';
 import { encuadrar, type Vista, zoomEn } from './vista';
 
 export function Lienzo({ escena }: { escena: Escena }) {
@@ -87,10 +88,21 @@ const recortar = (texto: string, ancho: number) => {
   return texto.length > max ? texto.slice(0, max - 1) + '…' : texto;
 };
 
+// un pod nuevo brilla BRILLO_POD_NUEVO.veces y para; uno Terminating queda atenuado
+const brillo = { animation: `brillo ${BRILLO_POD_NUEVO.msPorVez}ms ease-in-out ${BRILLO_POD_NUEVO.veces}` };
+
 function TarjetaPod({ pod: p }: { pod: PodEnEscena }) {
   return (
-    <g>
-      <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={8} className="pod" />
+    <g className={p.terminando ? 'pod-terminando' : undefined}>
+      <rect
+        x={p.x}
+        y={p.y}
+        width={p.ancho}
+        height={p.alto}
+        rx={8}
+        className={p.nuevo ? 'pod pod-nuevo' : 'pod'}
+        style={p.nuevo ? brillo : undefined}
+      />
       <text x={p.x + 13} y={p.y + 20} className="pod-nombre">
         {recortar(p.nombre, p.ancho)}
         <title>{`${p.nombre} · namespace ${p.namespace}`}</title>

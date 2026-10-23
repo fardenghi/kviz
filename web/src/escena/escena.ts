@@ -3,8 +3,10 @@
 import type { Foto, Pod } from '../foto';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface EstadoInterfaz {}
+export interface EstadoInterfaz {
+  /** ids de escena de los pods que acaban de aparecer y tienen que brillar (ver tiempoReal.ts). */
+  podsNuevos?: ReadonlySet<string>;
+}
 
 export interface Caja {
   x: number;
@@ -29,6 +31,10 @@ export interface PodEnEscena extends Caja {
   ip: string | null;
   /** id de la región que lo contiene. */
   region: string;
+  /** Acaba de aparecer: brilla 3 veces. */
+  nuevo: boolean;
+  /** Se está borrando (`Terminating`): se ve atenuado hasta que desaparece. */
+  terminando: boolean;
 }
 
 export interface Escena {
@@ -53,7 +59,7 @@ export const idPod = (p: Pick<Pod, 'namespace' | 'nombre'>) => `pod:${p.namespac
 
 export const SIN_NODO = 'sin-nodo';
 
-export function construirEscena(foto: Foto, _estado: EstadoInterfaz = {}): Escena {
+export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena {
   const M = MEDIDAS;
   const regiones: RegionEnEscena[] = [];
   const pods: PodEnEscena[] = [];
@@ -86,6 +92,8 @@ export function construirEscena(foto: Foto, _estado: EstadoInterfaz = {}): Escen
         namespace: p.namespace,
         ip: p.ip,
         region: g.id,
+        nuevo: estado.podsNuevos?.has(idPod(p)) ?? false,
+        terminando: p.terminando,
         x: x + M.relleno + (i % M.columnas) * (M.anchoPod + M.hueco),
         y: y + M.cabecera + Math.floor(i / M.columnas) * (M.altoPod + M.hueco),
         ancho: M.anchoPod,

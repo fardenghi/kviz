@@ -1,42 +1,40 @@
 import { useEffect, useMemo, useState } from 'react';
-import { pedirFoto } from './api';
+import { escucharFoto } from './api';
 import { construirEscena } from './escena/escena';
-import type { Foto } from './foto';
 import { Lienzo } from './lienzo/Lienzo';
-
-// Mientras kviz está desconectado vuelve a pedir la foto cada tanto. Las actualizaciones en vivo
-// llegan con el canal de streaming (ticket de tiempo real).
-const REINTENTO_MS = 2000;
+import { EN_VIVO_INICIAL, type EnVivo, finDelBrillo, podsNuevos, recibir } from './tiempoReal';
 
 export function App() {
-  const [foto, setFoto] = useState<Foto | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // la foto llega por el canal de streaming y se actualiza sola (ver tiempoReal.ts)
+  const [enVivo, setEnVivo] = useState<EnVivo>(EN_VIVO_INICIAL);
+  const [cortado, setCortado] = useState(false);
+  // se cambia cuando termina el brillo de los pods nuevos, para volver a armar la escena sin él
+  const [finBrillo, setFinBrillo] = useState(0);
+
+  useEffect(
+    () =>
+      escucharFoto(
+        (m) => {
+          setEnVivo((e) => recibir(e, m, Date.now()));
+          setCortado(false);
+        },
+        () => setCortado(true),
+      ),
+    [],
+  );
 
   useEffect(() => {
-    let vivo = true;
-    let espera: ReturnType<typeof setTimeout>;
-    const pedir = () =>
-      pedirFoto().then(
-        (f) => {
-          if (!vivo) return;
-          setFoto(f);
-          setError(null);
-          if (!f.conectado) espera = setTimeout(pedir, REINTENTO_MS);
-        },
-        (e: Error) => {
-          if (!vivo) return;
-          setError(e.message);
-          espera = setTimeout(pedir, REINTENTO_MS);
-        },
-      );
-    pedir();
-    return () => {
-      vivo = false;
-      clearTimeout(espera);
-    };
-  }, []);
+    const fin = finDelBrillo(enVivo, Date.now());
+    if (fin === null) return;
+    const espera = setTimeout(() => setFinBrillo(fin), fin - Date.now());
+    return () => clearTimeout(espera);
+  }, [enVivo, finBrillo]);
 
-  const escena = useMemo(() => (foto?.conectado ? construirEscena(foto) : null), [foto]);
+  const foto = enVivo.foto;
+  const escena = useMemo(
+    () => (foto?.conectado ? construirEscena(foto, { podsNuevos: podsNuevos(enVivo, Date.now()) }) : null),
+    [enVivo, finBrillo], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   return (
     <div className="app">
@@ -50,9 +48,9 @@ export function App() {
           </span>
         )}
       </header>
-      {error && <div className="aviso">No se pudo hablar con kviz: {error}</div>}
-      {!error && !foto && <div className="aviso">Cargando…</div>}
-      {!error && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
+      {cortado && <div className="aviso">Se cortó la conexión con kviz; reintentando…</div>}
+      {!cortado && !foto && <div className="aviso">Cargando…</div>}
+      {!cortado && foto && !foto.conectado && <div className="aviso">{foto.motivo ?? 'Desconectado del cluster.'}</div>}
       {escena && <Lienzo escena={escena} />}
     </div>
   );

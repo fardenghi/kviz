@@ -10,7 +10,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Foto es el estado del cluster tal como lo ve la interfaz.
+// Foto es el estado del cluster tal como lo ve la interfaz. Viaja completa al conectarse y
+// después como cambios (ver Cambio): cada objeto de una lista lleva un "id" único en su lista,
+// y las listas van ordenadas por id.
 type Foto struct {
 	// Contexto es el contexto de kubectl de kviz (por ejemplo "kind-lab"); "" si no hay ninguno.
 	Contexto string `json:"contexto"`
@@ -23,11 +25,15 @@ type Foto struct {
 }
 
 type Nodo struct {
+	// ID es el nombre del nodo.
+	ID         string `json:"id"`
 	Nombre     string `json:"nombre"`
 	InternalIP string `json:"internalIP"`
 }
 
 type Pod struct {
+	// ID es "<namespace>/<nombre>".
+	ID        string `json:"id"`
 	Nombre    string `json:"nombre"`
 	Namespace string `json:"namespace"`
 	// Nodo es nil cuando el scheduler todavía no le asignó un nodo.
@@ -36,6 +42,9 @@ type Pod struct {
 	IP *string `json:"ip"`
 	// Fase es status.phase: Pending, Running, Succeeded, Failed o Unknown.
 	Fase string `json:"fase"`
+	// Terminando es true mientras el pod se está borrando (`Terminating` en kubectl): tiene
+	// deletionTimestamp y todavía no desapareció.
+	Terminando bool `json:"terminando"`
 }
 
 // Objetos son los objetos de Kubernetes de los que sale la foto.
@@ -44,31 +53,27 @@ type Objetos struct {
 	Pods  []*corev1.Pod
 }
 
-// Construir traduce los objetos a la foto. Es pura y determinista: ordena nodos por nombre
-// y pods por namespace y nombre, así la misma entrada da siempre la misma foto.
+// Construir traduce los objetos a la foto. Es pura y determinista: ordena cada lista por id
+// (nodos por nombre, pods por namespace y nombre), así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
 	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}}
 	for _, n := range o.Nodos {
-		f.Nodos = append(f.Nodos, Nodo{Nombre: n.Name, InternalIP: internalIP(n)})
+		f.Nodos = append(f.Nodos, Nodo{ID: n.Name, Nombre: n.Name, InternalIP: internalIP(n)})
 	}
-	sort.Slice(f.Nodos, func(i, j int) bool { return f.Nodos[i].Nombre < f.Nodos[j].Nombre })
+	sort.Slice(f.Nodos, func(i, j int) bool { return f.Nodos[i].ID < f.Nodos[j].ID })
 
 	for _, p := range o.Pods {
 		f.Pods = append(f.Pods, Pod{
-			Nombre:    p.Name,
-			Namespace: p.Namespace,
-			Nodo:      opcional(p.Spec.NodeName),
-			IP:        opcional(p.Status.PodIP),
-			Fase:      string(p.Status.Phase),
+			ID:         p.Namespace + "/" + p.Name,
+			Nombre:     p.Name,
+			Namespace:  p.Namespace,
+			Nodo:       opcional(p.Spec.NodeName),
+			IP:         opcional(p.Status.PodIP),
+			Fase:       string(p.Status.Phase),
+			Terminando: p.DeletionTimestamp != nil,
 		})
 	}
-	sort.Slice(f.Pods, func(i, j int) bool {
-		a, b := f.Pods[i], f.Pods[j]
-		if a.Namespace != b.Namespace {
-			return a.Namespace < b.Namespace
-		}
-		return a.Nombre < b.Nombre
-	})
+	sort.Slice(f.Pods, func(i, j int) bool { return f.Pods[i].ID < f.Pods[j].ID })
 	return f
 }
 
