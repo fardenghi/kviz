@@ -15,6 +15,7 @@ const pod = (nombre: string, nodo: string | null, ip: string | null = '10.244.0.
   estado: nodo ? 'Running' : 'Pending',
   containers: [],
   workload: null,
+  hostPorts: [],
 });
 const foto = (parte: Partial<Foto>): Foto => ({
   contexto: 'kind-lab',
@@ -23,6 +24,8 @@ const foto = (parte: Partial<Foto>): Foto => ({
   pods: [],
   workloads: [],
   services: [],
+  ingress: [],
+  puertas: [],
   ...parte,
 });
 

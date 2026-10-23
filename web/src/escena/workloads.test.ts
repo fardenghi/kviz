@@ -20,6 +20,7 @@ const pod = (namespace: string, nombre: string, nodo: string, workload: string |
   estado: 'Running',
   containers: [],
   workload,
+  hostPorts: [],
 });
 
 const workload = (tipo: Workload['tipo'], namespace: string, nombre: string, color: string, cadena: Workload['cadena']): Workload => ({
@@ -43,6 +44,8 @@ const lab = (): Foto => ({
   contexto: 'kind-lab',
   conectado: true,
   services: [],
+  ingress: [],
+  puertas: [],
   nodos: [
     { id: 'lab-worker', nombre: 'lab-worker', internalIP: '172.23.0.4' },
     { id: 'lab-worker2', nombre: 'lab-worker2', internalIP: '172.23.0.3' },

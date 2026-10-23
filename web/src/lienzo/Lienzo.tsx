@@ -1,7 +1,15 @@
 // Lienzo (módulo 2 del frontend): dibuja la escena en SVG, con zoom por rueda, arrastre y botón de
 // encuadrar. No decide nada sobre el cluster: todo lo que dibuja viene de la escena.
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import type { ConexionEnEscena, Escena, PodEnEscena, RegionEnEscena, ServiceEnEscena } from '../escena/escena';
+import type {
+  ConexionEnEscena,
+  Escena,
+  IngressEnEscena,
+  PodEnEscena,
+  PuertaEnEscena,
+  RegionEnEscena,
+  ServiceEnEscena,
+} from '../escena/escena';
 import { BRILLO_POD_NUEVO } from '../tiempoReal';
 import { encuadrar, type Vista, zoomEn } from './vista';
 
@@ -82,8 +90,14 @@ export function Lienzo({
           {escena.conexiones.map((c) => (
             <Conexion key={c.id} conexion={c} />
           ))}
+          {escena.ingress.map((i) => (
+            <TarjetaIngress key={i.id} ingress={i} />
+          ))}
           {escena.services.map((s) => (
             <TarjetaService key={s.id} service={s} />
+          ))}
+          {escena.puertas.map((p) => (
+            <PestanaPuerta key={p.id} puerta={p} />
           ))}
           {escena.pods.map((p) => (
             <TarjetaPod key={p.id} pod={p} />
@@ -136,6 +150,40 @@ function TarjetaService({ service: s }: { service: ServiceEnEscena }) {
     </g>
   );
 }
+
+function TarjetaIngress({ ingress: i }: { ingress: IngressEnEscena }) {
+  return (
+    <g>
+      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className="ingress" />
+      <text x={i.x + 12} y={i.y + 22} className="pod-nombre">
+        {recortar(i.nombre, i.ancho - 6.2 * (i.clase.length + 10))} <tspan className="tipo">Ingress · {i.clase}</tspan>
+        <title>{`Ingress ${i.nombre} · namespace ${i.namespace}`}</title>
+      </text>
+      {i.reglas.map((r, n) => (
+        <text key={n} x={i.x + 12} y={i.y + 41 + n * 14} className="mono">
+          {recortarMono(r, i.ancho - 24)}
+          <title>{r}</title>
+        </text>
+      ))}
+    </g>
+  );
+}
+
+function PestanaPuerta({ puerta: p }: { puerta: PuertaEnEscena }) {
+  return (
+    <g>
+      <rect x={p.x} y={p.y} width={p.ancho} height={p.alto} rx={5} className={`puerta puerta-${p.tipo}`} />
+      <text x={p.x + p.ancho / 2} y={p.y + 16} className={`puerta-texto puerta-texto-${p.tipo}`}>{p.texto}</text>
+      <title>{p.titulo}</title>
+    </g>
+  );
+}
+
+// recorta un texto monoespaciado de 10.5 px (aprox. 6.3 px por letra) para que entre en el ancho
+const recortarMono = (texto: string, ancho: number) => {
+  const max = Math.floor(ancho / 6.3);
+  return texto.length > max ? texto.slice(0, max - 1) + '…' : texto;
+};
 
 // recorta el nombre para que entre en la tarjeta (aprox. 6.8 px por letra a 11.5 px, negrita)
 const recortar = (texto: string, ancho: number) => {

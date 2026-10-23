@@ -17,6 +17,10 @@ export interface Foto {
   workloads: Workload[];
   /** Ordenados por id (namespace y nombre). */
   services: Service[];
+  /** Ordenados por id (namespace y nombre). */
+  ingress: Ingress[];
+  /** Ordenadas por id (nodo, puerto y protocolo: el orden del texto, no el numérico). */
+  puertas: Puerta[];
 }
 
 export interface Nodo {
@@ -43,6 +47,8 @@ export interface Pod {
   containers: Container[];
   /** id del workload dueño del pod; null si es un Pod suelto. */
   workload: string | null;
+  /** Puertos de sus containers que se abren en su nodo. */
+  hostPorts: HostPort[];
 }
 
 export type TipoDeWorkload = 'Deployment' | 'ReplicaSet' | 'StatefulSet' | 'DaemonSet' | 'Job' | 'CronJob';
@@ -96,6 +102,14 @@ export interface Puerto {
   protocolo: string;
 }
 
+export interface HostPort {
+  /** El hostPort: el número que se abre en el nodo. */
+  puerto: number;
+  protocolo: string;
+  container: string;
+  containerPort: number;
+}
+
 export interface Service {
   /** `<namespace>/<nombre>`. */
   id: string;
@@ -128,4 +142,50 @@ export interface Endpoint {
   nodo: string | null;
   /** conditions.ready de la EndpointSlice. */
   listo: boolean;
+}
+
+export interface Ingress {
+  /** `<namespace>/<nombre>`. */
+  id: string;
+  nombre: string;
+  namespace: string;
+  /** spec.ingressClassName (o la anotación vieja kubernetes.io/ingress.class); null si no tiene. */
+  clase: string | null;
+  /** Anotación nginx.ingress.kubernetes.io/rewrite-target; vale para todas las reglas. */
+  rewrite: string | null;
+  /** En el orden del Ingress; el backend por defecto, si hay, va al final sin host ni path. */
+  reglas: ReglaIngress[];
+}
+
+export interface ReglaIngress {
+  /** "" si la regla vale para cualquier host. */
+  host: string;
+  path: string;
+  /** Exact, Prefix o ImplementationSpecific; "" en el backend por defecto. */
+  tipoPath: string;
+  /** Service destino, en el namespace del Ingress. */
+  service: string;
+  /** Puerto del Service: número, o el nombre de un puerto del Service. */
+  puerto: number | string;
+}
+
+/**
+ * Puerto abierto en un nodo hacia el cluster: un NodePort (una puerta en cada nodo) o un hostPort
+ * (una puerta solo en el nodo de su pod).
+ */
+export interface Puerta {
+  /** `<nodo>/<puerto>/<protocolo>`: en un nodo, un puerto y protocolo abre una sola puerta. */
+  id: string;
+  nodo: string;
+  puerto: number;
+  protocolo: string;
+  tipo: 'NodePort' | 'hostPort';
+  /** Namespace del Service o del pod al que lleva. */
+  namespace: string;
+  /** Service al que lleva una puerta NodePort; null en las de hostPort. */
+  service: string | null;
+  /** Pod al que lleva una puerta de hostPort; null en las NodePort. */
+  pod: string | null;
+  /** Puerto del Service (NodePort) o del container (hostPort) al que llega. */
+  haciaPuerto: number;
 }

@@ -15,6 +15,7 @@ const pod = (nombre: string, parte: Partial<Pod> = {}): Pod => ({
   estado: 'Running',
   containers: [],
   workload: null,
+  hostPorts: [],
   ...parte,
 });
 const foto = (pods: Pod[]): Foto => ({
@@ -24,6 +25,8 @@ const foto = (pods: Pod[]): Foto => ({
   pods,
   services: [],
   workloads: [],
+  ingress: [],
+  puertas: [],
 });
 
 const recibirTodos = (mensajes: Mensaje[], ahora = 0): EnVivo =>

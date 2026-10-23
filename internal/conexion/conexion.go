@@ -22,6 +22,7 @@ import (
 	listersbatchv1 "k8s.io/client-go/listers/batch/v1"
 	listerscorev1 "k8s.io/client-go/listers/core/v1"
 	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
+	listersnetworkingv1 "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"kviz/internal/foto"
@@ -44,6 +45,7 @@ type Conexion struct {
 	cronJobs     listersbatchv1.CronJobLister
 	services     listerscorev1.ServiceLister
 	slices       listersdiscoveryv1.EndpointSliceLister
+	ingress      listersnetworkingv1.IngressLister
 }
 
 // nueva arma una conexión sobre un cliente ya creado; los cambios de sus objetos avisan a a.
@@ -67,6 +69,8 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	slices := fabrica.Discovery().V1().EndpointSlices()
 	c.services = services.Lister()
 	c.slices = slices.Lister()
+	ingress := fabrica.Networking().V1().Ingresses()
+	c.ingress = ingress.Lister()
 	apps, batch := fabrica.Apps().V1(), fabrica.Batch().V1()
 	c.deployments = apps.Deployments().Lister()
 	c.replicaSets = apps.ReplicaSets().Lister()
@@ -77,7 +81,7 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 
 	// cada alta, modificación o baja de un objeto observado avisa al stream
 	for _, inf := range []cache.SharedIndexInformer{
-		nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(),
+		nodos.Informer(), pods.Informer(), services.Informer(), slices.Informer(), ingress.Informer(),
 		apps.Deployments().Informer(), apps.ReplicaSets().Informer(), apps.StatefulSets().Informer(),
 		apps.DaemonSets().Informer(), batch.Jobs().Informer(), batch.CronJobs().Informer(),
 	} {
@@ -107,7 +111,8 @@ func (c *Conexion) Objetos() foto.Objetos {
 	pods, _ := c.pods.List(labels.Everything())
 	services, _ := c.services.List(labels.Everything())
 	slices, _ := c.slices.List(labels.Everything())
-	o := foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices}
+	ingress, _ := c.ingress.List(labels.Everything())
+	o := foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices, Ingress: ingress}
 	o.Deployments, _ = c.deployments.List(labels.Everything())
 	o.ReplicaSets, _ = c.replicaSets.List(labels.Everything())
 	o.StatefulSets, _ = c.statefulSets.List(labels.Everything())

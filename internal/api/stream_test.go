@@ -13,6 +13,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -145,6 +146,26 @@ func TestUnWorkloadNuevoLlegaComoActualizacion(t *testing.T) {
 
 	if c := stream.esperarCambio(t, "workloads", "StatefulSet/default/db"); c.Borrado {
 		t.Fatalf("cambio = %s, want el alta del StatefulSet", mostrar(c))
+	}
+}
+
+func TestUnIngressNuevoLlegaComoActualizacion(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab")
+	stream := kviz.abrirStream(t)
+	stream.siguiente(t)
+
+	ing := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "backend"},
+		Spec:       networkingv1.IngressSpec{DefaultBackend: backendIngress("backend", 80, "")},
+	}
+	if _, err := kviz.cliente.NetworkingV1().Ingresses("default").Create(context.Background(), ing, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	c := stream.esperarCambio(t, "ingress", "default/backend")
+	var got ingressEnFoto
+	if err := json.Unmarshal(c.Valor, &got); err != nil || c.Borrado || got.Nombre != "backend" || len(got.Reglas) != 1 || got.Reglas[0].Service != "backend" {
+		t.Fatalf("cambio = %s, want el alta del Ingress backend hacia el Service backend", mostrar(c))
 	}
 }
 
