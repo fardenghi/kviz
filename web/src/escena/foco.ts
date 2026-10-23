@@ -1,10 +1,10 @@
-// Foco en la vista de topología: el Service, pod, Ingress o puerta que el usuario apunta (hover) o
+// Foco en la vista de topología: el Service, pod, Ingress o puerta que el usuario apunta con el mouse o
 // selecciona. Sus relacionados se calculan sobre la escena ya ubicada (conexiones y destinos de
 // puertas), así solo cuentan los objetos que se ven.
 import type { ConexionEnEscena, Escena, EstadoInterfaz, MarcasDeFoco, TonoConexion } from './escena';
 import { hayRecorrido } from './recorrido';
 
-/** Opacidad de los objetos sin relación con el foco mientras hay hover. */
+/** Opacidad de los objetos sin relación con el foco mientras hay un objeto apuntado. */
 export const OPACIDAD_ACLARADO = 0.45;
 
 /** Solo estos objetos toman foco: seleccionar un nodo o un workload no es foco. */
@@ -13,18 +13,18 @@ const TIPOS_CON_FOCO = ['service', 'pod', 'ingress', 'puerta'];
 const tipoDe = (id: string) => id.slice(0, id.indexOf(':'));
 
 /**
- * El foco: el hover manda sobre la selección. Un id que no está en la escena no es foco. Mientras
+ * El foco: el objeto apuntado manda sobre la selección. Un id que no está en la escena no es foco. Mientras
  * hay un recorrido no hay foco (un clic solo abre el panel de detalle).
  */
-export function focoDe(escena: Escena, estado: EstadoInterfaz): { foco: string | null; porHover: boolean } {
-  if (hayRecorrido(estado)) return { foco: null, porHover: false };
+export function focoDe(escena: Escena, estado: EstadoInterfaz): { foco: string | null; porApuntado: boolean } {
+  if (hayRecorrido(estado)) return { foco: null, porApuntado: false };
   const enEscena = (id: string | null | undefined): id is string =>
     !!id &&
     TIPOS_CON_FOCO.includes(tipoDe(id)) &&
     [escena.pods, escena.services, escena.ingress, escena.puertas].some((l) => l.some((o) => o.id === id));
-  if (enEscena(estado.hover)) return { foco: estado.hover, porHover: true };
-  if (enEscena(estado.seleccionado)) return { foco: estado.seleccionado, porHover: false };
-  return { foco: null, porHover: false };
+  if (enEscena(estado.apuntado)) return { foco: estado.apuntado, porApuntado: true };
+  if (enEscena(estado.seleccionado)) return { foco: estado.seleccionado, porApuntado: false };
+  return { foco: null, porApuntado: false };
 }
 
 /**
@@ -103,20 +103,20 @@ const DESVIO_LINEA_DE_PUERTA = 30;
  * `podsDelWorkload`: ids de escena de los pods del workload seleccionado, o null sin selección.
  */
 export function aplicarFoco(escena: Escena, estado: EstadoInterfaz, podsDelWorkload: ReadonlySet<string> | null): Escena {
-  const { foco, porHover } = focoDe(escena, estado);
+  const { foco, porApuntado } = focoDe(escena, estado);
   const rel = relacionadosCon(escena, foco);
   const tono = (c: ConexionEnEscena): TonoConexion => {
     if (foco) return rel.has(c.desde) && rel.has(c.hasta) ? 'foco' : 'fantasma';
     if (podsDelWorkload) return podsDelWorkload.has(c.hasta) ? c.tono : 'fantasma';
     return c.tono;
   };
-  // con hover se aclara lo no relacionado; la opacidad que ya traía (workload, Terminating) se respeta
-  const marcar = <T extends { id: string } & MarcasDeFoco>(o: T, resaltado: boolean): T => ({
+  // al apuntar se aclara lo no relacionado; la opacidad que ya traía (workload, Terminating) se respeta
+  const marcar = <T extends { id: string } & MarcasDeFoco>(o: T, marcado: boolean): T => ({
     ...o,
-    resaltado,
-    opacidad: porHover && !rel.has(o.id) ? Math.min(o.opacidad, OPACIDAD_ACLARADO) : o.opacidad,
+    marcado,
+    opacidad: porApuntado && !rel.has(o.id) ? Math.min(o.opacidad, OPACIDAD_ACLARADO) : o.opacidad,
   });
-  const caja = <T extends { id: string } & MarcasDeFoco>(o: T) => marcar(o, o.id === foco || (porHover && rel.has(o.id)));
+  const caja = <T extends { id: string } & MarcasDeFoco>(o: T) => marcar(o, o.id === foco || (porApuntado && rel.has(o.id)));
   return {
     ...escena,
     pods: escena.pods.map(caja),

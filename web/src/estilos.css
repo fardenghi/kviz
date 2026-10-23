@@ -78,17 +78,17 @@ body { background: var(--fondo); }
 .conexion-puerta.conexion-foco { stroke: #1f7a8c; stroke-dasharray: 4 3; }
 .flecha { fill: context-stroke; }
 g.objeto { cursor: pointer; transition: opacity .15s; }
-.pod.resaltado, .service.resaltado, .ingress.resaltado { stroke: var(--foco); stroke-width: 2; }
-.puerta-NodePort.resaltado { fill: #1f7a8c; stroke: #1f7a8c; }
-.puerta-hostPort.resaltado { fill: #a25a12; stroke: #a25a12; }
-.puerta.resaltado + .puerta-texto { fill: #fff; }
+.pod.marcado, .service.marcado, .ingress.marcado { stroke: var(--foco); stroke-width: 2; }
+.puerta-NodePort.marcado { fill: #1f7a8c; stroke: #1f7a8c; }
+.puerta-hostPort.marcado { fill: #a25a12; stroke: #a25a12; }
+.puerta.marcado + .puerta-texto { fill: #fff; }
 .puerta-texto { pointer-events: none; }
 .pod-mal { fill: #fff8f8; stroke: #f0c4c4; }
 
 /* advertencias de configuración: punto rojo con "!" en la esquina del objeto; Service e Ingress con borde rojizo */
 .advertencia-punto { fill: var(--mal); stroke: #fff; stroke-width: 2; }
 .advertencia-texto { font-size: 11px; font-weight: 800; fill: #fff; text-anchor: middle; pointer-events: none; }
-.service.con-advertencia:not(.resaltado), .ingress.con-advertencia:not(.resaltado) { stroke: #efb4b4; }
+.service.con-advertencia:not(.marcado), .ingress.con-advertencia:not(.marcado) { stroke: #efb4b4; }
 
 /* marcas por pod: estado (solo si no es Running), containers y reinicios */
 .pod-estado { font-size: 10.5px; font-weight: 600; text-anchor: end; }

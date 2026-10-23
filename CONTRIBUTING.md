@@ -64,7 +64,7 @@ npm --prefix web run dev       # UI with hot reload; /api is proxied to the back
 | `web/src/foto.ts` | TypeScript mirror of the snapshot contract |
 | `web/src/tiempoReal.ts` | applies stream messages to the snapshot and remembers new pods (glow) |
 | `web/src/escena/` | scene of the topology view: pure function (seam 2) |
-| `web/src/escena/recorrido.ts` | path of a test request: numbered steps per object (and region), dimming, `recorrido` tone, arc for the hop between nodes, selected step, Ingress Controller pods made visible; turns hover focus off |
+| `web/src/escena/recorrido.ts` | path of a test request: numbered steps per object (and region), dimming, `recorrido` tone, arc for the hop between nodes, selected step, Ingress Controller pods made visible; turns the focus (foco) off |
 | `web/src/escena/workloads.ts` | workload mark per pod, workload selection and the chain text |
 | `web/src/escena/reparto.ts` | load spread badges (`n/N`) on pods |
 | `web/src/prueba.ts` | TypeScript mirror of the test request and its path (`POST /api/pruebas`) |

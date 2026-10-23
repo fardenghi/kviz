@@ -1,5 +1,5 @@
 // Costura 2: foco en la vista de topología (relacionados, tonos de conexión, líneas de puerta,
-// aclarado por hover) y su prioridad sobre el workload seleccionado.
+// aclarado al apuntar) y su prioridad sobre el workload seleccionado.
 import { describe, expect, it } from 'vitest';
 import type { Endpoint, Foto, Pod, Puerta, Service } from '../foto';
 import { construirEscena, type Escena, type EstadoInterfaz } from './escena';
@@ -122,45 +122,45 @@ const lineasDePuerta = (e: Escena) => e.conexiones.filter((c) => c.desde.startsW
 
 describe('relacionados con el foco', () => {
   it('un Service arrastra su Ingress, sus endpoints listos y no listos y sus puertas NodePort', () => {
-    const escena = conFoco({ hover: SVC_BACKEND });
+    const escena = conFoco({ apuntado: SVC_BACKEND });
 
     expect(escena.foco).toBe(SVC_BACKEND);
     expect(escena.relacionados).toEqual(ordenados([SVC_BACKEND, ING_BACKEND, POD_A, POD_B, POD_C, ...NODEPORTS]));
   });
 
   it('un pod arrastra sus Services y los Ingress y puertas de esos Services, sin los pods hermanos', () => {
-    const escena = conFoco({ hover: POD_A });
+    const escena = conFoco({ apuntado: POD_A });
 
     expect(escena.relacionados).toEqual(ordenados([POD_A, SVC_BACKEND, ING_BACKEND, ...NODEPORTS]));
   });
 
   it('un pod con hostPort arrastra sus puertas hostPort', () => {
-    const escena = conFoco({ hover: POD_IC });
+    const escena = conFoco({ apuntado: POD_IC });
 
     expect(escena.relacionados).toEqual(ordenados([POD_IC, ...HOSTPORTS]));
   });
 
   it('un Ingress arrastra su Service y lo que ese Service arrastra', () => {
-    const escena = conFoco({ hover: ING_BACKEND });
+    const escena = conFoco({ apuntado: ING_BACKEND });
 
     expect(escena.relacionados).toEqual(ordenados([ING_BACKEND, SVC_BACKEND, POD_A, POD_B, POD_C, ...NODEPORTS]));
   });
 
   it('una puerta NodePort arrastra su Service y lo que ese Service arrastra', () => {
-    const escena = conFoco({ hover: 'puerta:lab-worker/30010' });
+    const escena = conFoco({ apuntado: 'puerta:lab-worker/30010' });
 
     expect(escena.relacionados).toEqual(ordenados([SVC_BACKEND, ING_BACKEND, POD_A, POD_B, POD_C, ...NODEPORTS]));
   });
 
   it('una puerta hostPort arrastra solo su pod', () => {
-    const escena = conFoco({ hover: 'puerta:lab-worker2/80' });
+    const escena = conFoco({ apuntado: 'puerta:lab-worker2/80' });
 
     expect(escena.relacionados).toEqual(ordenados(['puerta:lab-worker2/80', POD_IC]));
   });
 
-  it('seleccionar un objeto también es foco, pero el hover manda sobre la selección', () => {
+  it('seleccionar un objeto también es foco, pero el objeto apuntado manda sobre la selección', () => {
     expect(conFoco({ seleccionado: SVC_DB }).relacionados).toEqual(ordenados([SVC_DB, POD_DB]));
-    expect(conFoco({ seleccionado: SVC_DB, hover: POD_DB }).foco).toBe(POD_DB);
+    expect(conFoco({ seleccionado: SVC_DB, apuntado: POD_DB }).foco).toBe(POD_DB);
   });
 
   it('seleccionar un nodo o un workload no es foco', () => {
@@ -172,7 +172,7 @@ describe('relacionados con el foco', () => {
   });
 
   it('un objeto que no está en la escena no es foco', () => {
-    const escena = construirEscena(guia(), { hover: POD_IC }); // el sistema está oculto
+    const escena = construirEscena(guia(), { apuntado: POD_IC }); // el sistema está oculto
 
     expect(escena.foco).toBeNull();
     expect(escena.conexiones.map((c) => c.tono)).not.toContain('fantasma');
@@ -181,7 +181,7 @@ describe('relacionados con el foco', () => {
 
 describe('tono de las conexiones', () => {
   it('con foco, las conexiones entre relacionados son "foco" y las demás "fantasma"', () => {
-    const escena = conFoco({ hover: POD_A });
+    const escena = conFoco({ apuntado: POD_A });
 
     expect(tono(escena, ING_BACKEND, SVC_BACKEND)).toBe('foco');
     expect(tono(escena, SVC_BACKEND, POD_A)).toBe('foco');
@@ -216,7 +216,7 @@ describe('tono de las conexiones', () => {
   });
 
   it('el foco tiene prioridad sobre el workload seleccionado', () => {
-    const escena = conFoco({ workloadSeleccionado: BACKEND, hover: SVC_DB });
+    const escena = conFoco({ workloadSeleccionado: BACKEND, apuntado: SVC_DB });
 
     expect(tono(escena, SVC_DB, POD_DB)).toBe('foco');
     expect(tono(escena, SVC_BACKEND, POD_A)).toBe('fantasma');
@@ -231,7 +231,7 @@ describe('líneas de puerta', () => {
   });
 
   it('con foco en un Service van de cada puerta NodePort al borde de abajo del Service, en tono "foco"', () => {
-    const escena = conFoco({ hover: SVC_BACKEND });
+    const escena = conFoco({ apuntado: SVC_BACKEND });
     const svc = escena.services.find((s) => s.id === SVC_BACKEND)!;
 
     const lineas = lineasDePuerta(escena);
@@ -249,26 +249,26 @@ describe('líneas de puerta', () => {
   });
 
   it('con foco en un pod con hostPort van de sus puertas al pod', () => {
-    const lineas = lineasDePuerta(conFoco({ hover: POD_IC }));
+    const lineas = lineasDePuerta(conFoco({ apuntado: POD_IC }));
 
     expect(ordenados(lineas.map((c) => c.desde))).toEqual(ordenados(HOSTPORTS));
     for (const c of lineas) expect(c).toMatchObject({ hasta: POD_IC, tono: 'foco' });
   });
 
   it('con foco en algo sin relación con las puertas no aparece ninguna', () => {
-    expect(lineasDePuerta(conFoco({ hover: SVC_DB }))).toEqual([]);
+    expect(lineasDePuerta(conFoco({ apuntado: SVC_DB }))).toEqual([]);
   });
 });
 
 /** Opacidad de cada objeto de la escena (pods, Services, Ingress y puertas), por id. */
 const opacidades = (e: Escena) =>
   Object.fromEntries([...e.pods, ...e.services, ...e.ingress, ...e.puertas].map((o) => [o.id, o.opacidad]));
-const resaltados = (e: Escena) =>
-  ordenados([...e.pods, ...e.services, ...e.ingress, ...e.puertas].filter((o) => o.resaltado).map((o) => o.id));
+const marcados = (e: Escena) =>
+  ordenados([...e.pods, ...e.services, ...e.ingress, ...e.puertas].filter((o) => o.marcado).map((o) => o.id));
 
 describe('objetos con foco', () => {
-  it('con hover, los objetos no relacionados se aclaran', () => {
-    const op = opacidades(conFoco({ hover: SVC_DB }));
+  it('al apuntar, los objetos no relacionados se aclaran', () => {
+    const op = opacidades(conFoco({ apuntado: SVC_DB }));
 
     expect(op[SVC_DB]).toBe(1);
     expect(op[POD_DB]).toBe(1);
@@ -281,21 +281,21 @@ describe('objetos con foco', () => {
     expect(Object.values(op).every((o) => o === 1)).toBe(true);
   });
 
-  it('el aclarado del hover se combina con el atenuado del workload seleccionado', () => {
-    const op = opacidades(conFoco({ hover: SVC_BACKEND, workloadSeleccionado: DB }));
+  it('el aclarado al apuntar se combina con el atenuado del workload seleccionado', () => {
+    const op = opacidades(conFoco({ apuntado: SVC_BACKEND, workloadSeleccionado: DB }));
 
     expect(op[POD_A]).toBe(0.18); // de otro workload, aunque esté relacionado
     expect(op[POD_DB]).toBe(0.45); // del workload pero sin relación con el foco
     expect(op[SVC_BACKEND]).toBe(1);
   });
 
-  it('con hover se resaltan el foco y sus relacionados; las puertas relacionadas se rellenan', () => {
-    expect(resaltados(conFoco({ hover: SVC_BACKEND }))).toEqual(
+  it('al apuntar se marcan el foco y sus relacionados; las puertas relacionadas se rellenan', () => {
+    expect(marcados(conFoco({ apuntado: SVC_BACKEND }))).toEqual(
       ordenados([SVC_BACKEND, ING_BACKEND, POD_A, POD_B, POD_C, ...NODEPORTS]),
     );
   });
 
-  it('con selección se resaltan el foco y las puertas relacionadas', () => {
-    expect(resaltados(conFoco({ seleccionado: POD_A }))).toEqual(ordenados([POD_A, ...NODEPORTS]));
+  it('con selección se marcan el foco y las puertas relacionadas', () => {
+    expect(marcados(conFoco({ seleccionado: POD_A }))).toEqual(ordenados([POD_A, ...NODEPORTS]));
   });
 });

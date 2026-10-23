@@ -24,7 +24,7 @@ export function Lienzo({
   escena: Escena;
   /** Clic sobre el fondo, sin arrastrar: limpia la selección. */
   alClicEnVacio?: () => void;
-  /** El mouse entra a un objeto (su id de escena) o sale de él (null): el foco por hover. */
+  /** El mouse entra a un objeto (su id de escena) o sale de él (null): el foco al apuntar. */
   alApuntar?: (id: string | null) => void;
   /** Clic sin arrastrar sobre un objeto (su id de escena; un nodo es su región): abre el panel de detalle. */
   alClicEnObjeto?: (id: string) => void;
@@ -141,7 +141,7 @@ export function Lienzo({
   );
 }
 
-/** Handlers del foco por hover de un objeto. */
+/** Handlers del foco al apuntar un objeto. */
 type Apuntar = { 'data-objeto': string; onMouseEnter: () => void; onMouseLeave: () => void };
 
 const clases = (...c: (string | false)[]) => c.filter(Boolean).join(' ');
@@ -205,7 +205,7 @@ function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apu
   const puertos = s.puertos.join(', ');
   return (
     <g className="objeto" opacity={s.opacidad} {...apuntar}>
-      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className={clases('service', s.advertencias.length > 0 && 'con-advertencia', s.resaltado && 'resaltado', s.pasos.length > 0 && 'en-recorrido')} />
+      <rect x={s.x} y={s.y} width={s.ancho} height={s.alto} rx={s.alto / 2} className={clases('service', s.advertencias.length > 0 && 'con-advertencia', s.marcado && 'marcado', s.pasos.length > 0 && 'en-recorrido')} />
       <text x={s.x + 20} y={s.y + 20} className="pod-nombre">
         {recortar(s.nombre, s.ancho - 12 - 6.2 * (s.tipo.length + 1))} <tspan className="tipo">{s.tipo}</tspan>
         <title>{`Service ${s.nombre} · namespace ${s.namespace}`}</title>
@@ -224,7 +224,7 @@ function TarjetaService({ service: s, apuntar }: { service: ServiceEnEscena; apu
 function TarjetaIngress({ ingress: i, apuntar }: { ingress: IngressEnEscena; apuntar: Apuntar }) {
   return (
     <g className="objeto" opacity={i.opacidad} {...apuntar}>
-      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className={clases('ingress', i.advertencias.length > 0 && 'con-advertencia', i.resaltado && 'resaltado', i.pasos.length > 0 && 'en-recorrido')} />
+      <rect x={i.x} y={i.y} width={i.ancho} height={i.alto} rx={8} className={clases('ingress', i.advertencias.length > 0 && 'con-advertencia', i.marcado && 'marcado', i.pasos.length > 0 && 'en-recorrido')} />
       <text x={i.x + 12} y={i.y + 22} className="pod-nombre">
         {recortar(i.nombre, i.ancho - 6.2 * (i.clase.length + 10))} <tspan className="tipo">Ingress · {i.clase}</tspan>
         <title>{`Ingress ${i.nombre} · namespace ${i.namespace}`}</title>
@@ -250,7 +250,7 @@ function PestanaPuerta({ puerta: p, apuntar }: { puerta: PuertaEnEscena; apuntar
         width={p.ancho}
         height={p.alto}
         rx={5}
-        className={clases('puerta', `puerta-${p.tipo}`, p.resaltado && 'resaltado', p.pasos.length > 0 && 'en-recorrido')}
+        className={clases('puerta', `puerta-${p.tipo}`, p.marcado && 'marcado', p.pasos.length > 0 && 'en-recorrido')}
       />
       <text x={p.x + p.ancho / 2} y={p.y + 16} className={`puerta-texto puerta-texto-${p.tipo}`}>{p.texto}</text>
       <title>{p.titulo}</title>
@@ -299,7 +299,7 @@ function TarjetaPod({ pod: p, apuntar }: { pod: PodEnEscena; apuntar: Apuntar })
           'pod',
           p.tonoEstado === 'mal' && 'pod-mal',
           p.nuevo && 'pod-nuevo',
-          p.resaltado && 'resaltado',
+          p.marcado && 'marcado',
           p.pasos.length > 0 && 'en-recorrido',
         )}
         style={{

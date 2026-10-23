@@ -30,7 +30,7 @@ export interface EstadoInterfaz {
    * id de escena del objeto apuntado con el mouse. Si es un Service, pod, Ingress o puerta, es el
    * foco (manda sobre la selección) y además aclara los objetos no relacionados.
    */
-  hover?: string | null;
+  apuntado?: string | null;
   /** id de escena del objeto seleccionado. Si es un Service, pod, Ingress o puerta, es el foco. */
   seleccionado?: string | null;
   /**
@@ -54,11 +54,11 @@ export interface Caja {
 /** Cómo marca el foco a un objeto (ver foco.ts). */
 export interface MarcasDeFoco {
   /**
-   * Borde azul (puertas: relleno sólido). Con hover, el foco y sus relacionados; con selección, el
-   * foco. Las puertas relacionadas se resaltan siempre.
+   * Borde azul (puertas: relleno sólido). Al apuntar, el foco y sus relacionados; con selección, el
+   * foco. Las puertas relacionadas se marcan siempre.
    */
-  resaltado: boolean;
-  /** 1, o aclarado si hay hover y no está relacionado con el foco (los pods además se atenúan por otras razones). */
+  marcado: boolean;
+  /** 1, o aclarado si hay un objeto apuntado y no está relacionado con el foco (los pods además se atenúan por otras razones). */
   opacidad: number;
 }
 
@@ -201,7 +201,7 @@ export interface Escena {
   conexiones: ConexionEnEscena[];
   /** Arcos de salto entre nodos del recorrido (ver recorrido.ts); vacío sin recorrido. */
   saltos: SaltoEnEscena[];
-  /** id del objeto con foco (hover o selección), o null. */
+  /** id del objeto con foco (apuntado o seleccionado), o null. */
   foco: string | null;
   /** ids de los objetos relacionados con el foco, incluido el foco, ordenados; vacío sin foco. */
   relacionados: string[];
@@ -343,7 +343,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         ip: p.ip,
         region: g.id,
         nuevo: estado.podsNuevos?.has(idPod(p)) ?? false,
-        resaltado: false,
+        marcado: false,
         pasos: [],
         ...terminando(p, seleccionDeWorkload(p, seleccionado)),
         workload: marcaDeWorkload(p, workloads),
@@ -406,7 +406,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
       y: r.y - M.altoPuerta / 2 - Math.floor(i / porFila) * M.pasoFilaPuerta,
       ancho: M.anchoPuerta,
       alto: M.altoPuerta,
-      resaltado: false,
+      marcado: false,
       opacidad: 1,
       pasos: [],
     })),
@@ -491,7 +491,7 @@ function ubicarIngress(visibles: Ingress[], services: ServiceEnEscena[], finEsce
       y: 0,
       ancho: M.anchoIngress,
       alto: M.altoIngress + (reglas.length - 1) * M.altoReglaIngress,
-      resaltado: false,
+      marcado: false,
       opacidad: 1,
       pasos: [],
       advertencias: [],
@@ -589,7 +589,7 @@ function ubicarServices(visibles: Service[], pods: PodEnEscena[], finRegiones: n
       y: fila * (M.altoService + M.huecoFilas),
       ancho: M.anchoService,
       alto: M.altoService,
-      resaltado: false,
+      marcado: false,
       opacidad: 1,
       pasos: [],
       advertencias: [],

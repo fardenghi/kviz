@@ -22,7 +22,7 @@ export function App() {
   const [namespace, setNamespace] = useState<string | null>(null);
   const [workload, setWorkload] = useState<string | null>(null);
   // objeto apuntado con el mouse: es el foco (ver escena/foco.ts)
-  const [hover, setHover] = useState<string | null>(null);
+  const [apuntado, setApuntado] = useState<string | null>(null);
   // objeto elegido con un clic (id de escena, o `workload:<id>` desde la lista): da el foco y abre
   // el panel de detalle (ver detalle/detalle.ts)
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export function App() {
             mostrarSistema,
             namespace: filtro,
             workloadSeleccionado,
-            hover,
+            apuntado,
             seleccionado,
             recorrido,
             pasoElegido: paso,
@@ -113,7 +113,7 @@ export function App() {
             podsNuevos: podsNuevos(enVivo, Date.now()),
           })
         : null,
-    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, hover, seleccionado, recorrido, paso, reparto], // eslint-disable-line react-hooks/exhaustive-deps
+    [enVivo, finBrillo, mostrarSistema, filtro, workloadSeleccionado, apuntado, seleccionado, recorrido, paso, reparto], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // el panel muestra el objeto mientras siga en la foto; si se borra, se cierra solo
@@ -193,7 +193,7 @@ export function App() {
             setWorkload(null);
             setSeleccionado(null);
           }}
-          alApuntar={setHover}
+          alApuntar={setApuntado}
           alClicEnObjeto={setSeleccionado}
         >
           <ListaDeWorkloads workloads={workloads} seleccionado={workloadSeleccionado} alSeleccionar={elegirWorkload} />

@@ -51,7 +51,7 @@ export function podsDelIngressController(recorrido: Recorrido | null | undefined
     });
 }
 
-/** Los pasos que se resaltan: el elegido, si es uno del recorrido, o todos. */
+/** Los pasos que se marcan: el elegido, si es uno del recorrido, o todos. */
 const pasosVisibles = (recorrido: Recorrido, elegido: number | null | undefined): Paso[] => {
   const solo = recorrido.pasos.filter((p) => p.n === elegido);
   return solo.length > 0 ? solo : recorrido.pasos;

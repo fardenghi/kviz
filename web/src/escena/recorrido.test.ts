@@ -144,19 +144,19 @@ describe('recorrido en la escena', () => {
     expect(tono(e, SVC_DB, POD_DB)).toBe('fantasma');
   });
 
-  it('apaga el foco: ni el hover ni la selección marcan relacionados mientras hay un recorrido', () => {
-    const e = conRecorrido({ hover: SVC_DB, seleccionado: ING_BACKEND });
+  it('apaga el foco: ni apuntar ni seleccionar marcan relacionados mientras hay un recorrido', () => {
+    const e = conRecorrido({ apuntado: SVC_DB, seleccionado: ING_BACKEND });
 
     expect(e.foco).toBeNull();
     expect(e.relacionados).toEqual([]);
     expect(e.conexiones.some((c) => c.tono === 'foco')).toBe(false);
-    expect(objetos(e).some((o) => o.resaltado)).toBe(false);
-    // el hover tampoco aclara: lo que participa sigue entero
+    expect(objetos(e).some((o) => o.marcado)).toBe(false);
+    // apuntar tampoco aclara: lo que participa sigue entero
     expect(objeto(e, POD_A).opacidad).toBe(1);
   });
 
   it('al cerrar el recorrido el foco vuelve a funcionar', () => {
-    const e = construirEscena(guia(), { recorrido: null, hover: SVC_DB });
+    const e = construirEscena(guia(), { recorrido: null, apuntado: SVC_DB });
 
     expect(e.foco).toBe(SVC_DB);
     expect(tono(e, SVC_DB, POD_DB)).toBe('foco');
