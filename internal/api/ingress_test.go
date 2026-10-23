@@ -11,12 +11,14 @@ import (
 
 // Ingress de la foto, tal como los lee la interfaz (web/src/foto.ts).
 type ingressEnFoto struct {
-	ID        string           `json:"id"`
-	Nombre    string           `json:"nombre"`
-	Namespace string           `json:"namespace"`
-	Clase     *string          `json:"clase"`
-	Rewrite   *string          `json:"rewrite"`
-	Reglas    []reglaDeIngress `json:"reglas"`
+	ID        string  `json:"id"`
+	Nombre    string  `json:"nombre"`
+	Namespace string  `json:"namespace"`
+	Clase     *string `json:"clase"`
+	// ClasePorDefecto: el Ingress no dice clase y toma la IngressClass por defecto del cluster.
+	ClasePorDefecto bool             `json:"clasePorDefecto"`
+	Rewrite         *string          `json:"rewrite"`
+	Reglas          []reglaDeIngress `json:"reglas"`
 }
 
 type reglaDeIngress struct {

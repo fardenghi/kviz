@@ -31,6 +31,7 @@ const ingress = (nombre: string): Ingress => ({
   nombre,
   namespace: 'default',
   clase: null,
+  clasePorDefecto: false,
   rewrite: null,
   reglas: [{ host: '', path: '/', tipoPath: 'Prefix', service: 'backend', puerto: 80 }],
 });

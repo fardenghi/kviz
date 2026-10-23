@@ -14,7 +14,17 @@ export default function DatosDelIngress({ detalle, foto, abrir }: PropsDeSeccion
         <Datos
           filas={[
             ['namespace', i.namespace],
-            ['clase', i.clase ?? <Nada>sin clase</Nada>],
+            [
+              'clase',
+              i.clase === null ? (
+                <Nada>sin clase</Nada>
+              ) : (
+                <>
+                  {i.clase}
+                  {i.clasePorDefecto && <Nada> (por defecto)</Nada>}
+                </>
+              ),
+            ],
             ['rewrite', i.rewrite ? <span className="mono-texto">{i.rewrite}</span> : <Nada>sin rewrite</Nada>],
           ]}
         />

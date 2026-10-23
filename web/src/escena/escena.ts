@@ -120,7 +120,7 @@ export interface IngressEnEscena extends Caja, MarcasDeFoco, MarcaDeAdvertencia,
   id: string;
   nombre: string;
   namespace: string;
-  /** La IngressClass, o `sin clase`. */
+  /** La IngressClass (con `(por defecto)` si la toma de la del cluster), o `sin clase`. */
   clase: string;
   /** Un texto por regla: `host/path → service:puerto`, con `⟲ rewrite` si el Ingress reescribe. */
   reglas: string[];
@@ -481,7 +481,7 @@ function ubicarIngress(visibles: Ingress[], services: ServiceEnEscena[], finEsce
       id: idIngress(i),
       nombre: i.nombre,
       namespace: i.namespace,
-      clase: i.clase ?? 'sin clase',
+      clase: i.clase === null ? 'sin clase' : i.clase + (i.clasePorDefecto ? ' (por defecto)' : ''),
       reglas,
       x,
       y: 0,

@@ -373,8 +373,13 @@ export interface Ingress {
   id: string;
   nombre: string;
   namespace: string;
-  /** spec.ingressClassName (o la anotación vieja kubernetes.io/ingress.class); null si no tiene. */
+  /**
+   * spec.ingressClassName (o la anotación vieja kubernetes.io/ingress.class); si no dice ninguna, la
+   * IngressClass por defecto del cluster (con `clasePorDefecto`); null si no tiene.
+   */
   clase: string | null;
+  /** El Ingress no dice clase y toma la IngressClass por defecto. */
+  clasePorDefecto: boolean;
   /** Anotación nginx.ingress.kubernetes.io/rewrite-target; vale para todas las reglas. */
   rewrite: string | null;
   /** En el orden del Ingress; el backend por defecto, si hay, va al final sin host ni path. */

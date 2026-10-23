@@ -13,8 +13,11 @@ type Ingress struct {
 	ID        string `json:"id"`
 	Nombre    string `json:"nombre"`
 	Namespace string `json:"namespace"`
-	// Clase es spec.ingressClassName, o la anotación vieja kubernetes.io/ingress.class; nil si no tiene.
+	// Clase es spec.ingressClassName, o la anotación vieja kubernetes.io/ingress.class, o si no dice
+	// ninguna la IngressClass por defecto del cluster (con ClasePorDefecto); nil si no tiene.
 	Clase *string `json:"clase"`
+	// ClasePorDefecto: el Ingress no dice clase y la toma de la IngressClass por defecto.
+	ClasePorDefecto bool `json:"clasePorDefecto"`
 	// Rewrite es la anotación nginx.ingress.kubernetes.io/rewrite-target; vale para todas las reglas.
 	Rewrite *string `json:"rewrite"`
 	// Reglas en el orden del Ingress; el backend por defecto, si hay, va al final sin host ni path.
@@ -36,16 +39,35 @@ type ReglaIngress struct {
 const (
 	anotacionClase   = "kubernetes.io/ingress.class"
 	anotacionRewrite = "nginx.ingress.kubernetes.io/rewrite-target"
+	// anotacionClasePorDefecto marca la IngressClass que toman los Ingress que no dicen ninguna.
+	anotacionClasePorDefecto = "ingressclass.kubernetes.io/is-default-class"
 )
+
+// ClasePorDefecto es la IngressClass marcada por defecto ("" si no hay): la que atiende a los
+// Ingress que no dicen clase. Con varias, la primera por nombre.
+func ClasePorDefecto(clases []*networkingv1.IngressClass) string {
+	porDefecto := ""
+	for _, c := range clases {
+		if c.Annotations[anotacionClasePorDefecto] == "true" && (porDefecto == "" || c.Name < porDefecto) {
+			porDefecto = c.Name
+		}
+	}
+	return porDefecto
+}
 
 func ingresses(o Objetos) []Ingress {
 	out := []Ingress{}
+	porDefecto := ClasePorDefecto(o.IngressClasses)
 	for _, ing := range o.Ingress {
 		i := Ingress{ID: ing.Namespace + "/" + ing.Name, Nombre: ing.Name, Namespace: ing.Namespace, Reglas: []ReglaIngress{}}
-		if ing.Spec.IngressClassName != nil {
+		switch {
+		case ing.Spec.IngressClassName != nil:
 			i.Clase = opcional(*ing.Spec.IngressClassName)
-		} else {
+		case ing.Annotations[anotacionClase] != "":
 			i.Clase = opcional(ing.Annotations[anotacionClase])
+		default:
+			i.Clase = opcional(porDefecto)
+			i.ClasePorDefecto = porDefecto != ""
 		}
 		i.Rewrite = opcional(ing.Annotations[anotacionRewrite])
 		for _, r := range ing.Spec.Rules {

@@ -33,6 +33,7 @@ const ingress = (nombre: string, services: string[], parte: Partial<Ingress> = {
   nombre,
   namespace: 'default',
   clase: 'nginx',
+  clasePorDefecto: false,
   rewrite: null,
   reglas: services.map((s) => ({ host: '', path: `/${s}`, tipoPath: 'Prefix', service: s, puerto: 80 })),
   ...parte,
@@ -95,6 +96,7 @@ const guia = () =>
         nombre: 'backend',
         namespace: 'default',
         clase: 'nginx',
+        clasePorDefecto: false,
         rewrite: '/$2',
         reglas: [{ host: '', path: '/backend(/|$)(.*)', tipoPath: 'ImplementationSpecific', service: 'backend', puerto: 80 }],
       },
@@ -118,6 +120,16 @@ describe('ubicación de los Ingress', () => {
     expect(centroX(ing)).toBeCloseTo(centroX(svc));
     expect(ing.y + ing.alto).toBeLessThan(svc.y);
     for (const r of escena.regiones) expect(ing.y + ing.alto).toBeLessThan(r.y);
+  });
+
+  it('dice cuándo la clase es la IngressClass por defecto del cluster', () => {
+    const f = guia();
+    f.ingress.push(ingress('sin-clase', ['backend'], { clasePorDefecto: true }));
+
+    const escena = construirEscena(f);
+
+    expect(escena.ingress.find((i) => i.nombre === 'sin-clase')?.clase).toBe('nginx (por defecto)');
+    expect(escena.ingress.find((i) => i.nombre === 'backend')?.clase).toBe('nginx');
   });
 
   it('muestra nombre, clase y una línea por regla con host, path, Service destino y rewrite', () => {

@@ -87,6 +87,7 @@ const guia = (): Foto => ({
       nombre: 'backend',
       namespace: 'default',
       clase: 'nginx',
+      clasePorDefecto: false,
       rewrite: '/$2',
       reglas: [{ host: '', path: '/backend(/|$)(.*)', tipoPath: 'ImplementationSpecific', service: 'backend', puerto: 80 }],
     },

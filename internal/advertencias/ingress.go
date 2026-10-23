@@ -8,19 +8,18 @@ import (
 	"strings"
 
 	networkingv1 "k8s.io/api/networking/v1"
-)
 
-// anotacionClasePorDefecto marca la IngressClass que toman los Ingress que no dicen ninguna.
-const anotacionClasePorDefecto = "ingressclass.kubernetes.io/is-default-class"
+	"github.com/fardenghi/kviz/internal/foto"
+)
 
 func (r *reglas) ingress() {
 	clases := map[string]bool{}
-	porDefecto := false
+	// la misma IngressClass por defecto con la que la foto (y el recorrido) atienden al Ingress
+	porDefecto := foto.ClasePorDefecto(r.o.IngressClasses) != ""
 	var nombres []string
 	for _, c := range r.o.IngressClasses {
 		clases[c.Name] = true
 		nombres = append(nombres, c.Name)
-		porDefecto = porDefecto || c.Annotations[anotacionClasePorDefecto] == "true"
 	}
 	sort.Strings(nombres)
 	hay := "El cluster no tiene ninguna IngressClass: falta instalar un Ingress Controller."

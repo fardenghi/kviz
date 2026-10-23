@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
 
@@ -286,4 +287,45 @@ func (k *kvizDePrueba) ingressControllerQueManda(t *testing.T, upstreams ...stri
 		return true, &runtime.Unknown{Raw: []byte(texto)}, nil
 	})
 	return l
+}
+
+// clusterDeLaGuiaConIngressSinClase es la guía con el Ingress sin spec.ingressClassName y la
+// IngressClass nginx marcada por defecto: el Ingress Controller lo atiende igual (historia 75).
+func clusterDeLaGuiaConIngressSinClase() []runtime.Object {
+	objetos := []runtime.Object{}
+	for _, o := range clusterDeLaGuia() {
+		switch o := o.(type) {
+		case *networkingv1.Ingress:
+			o.Spec.IngressClassName = nil
+		case *networkingv1.IngressClass:
+			o.Annotations = map[string]string{"ingressclass.kubernetes.io/is-default-class": "true"}
+		}
+		objetos = append(objetos, o)
+	}
+	return objetos
+}
+
+func TestUnIngressSinClaseLoAtiendeLaIngressClassPorDefecto(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuiaConIngressSinClase()...)
+	kviz.ingressControllerQueManda(t, "10.244.1.5:8081")
+	kviz.sondeo.responder(sondeo.RespuestaHTTP{Status: 200, Body: "Hello!"})
+
+	_, got := kviz.mandarPrueba(t, pedidoDePrueba{Destino: "lab-worker2:80", Path: "/backend/hello"})
+
+	if len(got.Recorrido.Pasos) < 3 || got.Recorrido.Pasos[2].Titulo != "/backend(/|$)(.*) → backend:80" {
+		t.Fatalf("recorrido = %s, want que pase por la regla del Ingress backend", mostrar(got.Recorrido.Pasos))
+	}
+	if a := kviz.advertencias(t); len(a) != 0 {
+		t.Errorf("advertencias = %s, want ninguna: la advertencia y el recorrido coinciden", mostrar(a))
+	}
+}
+
+func TestLaFotoDiceQueUnIngressSinClaseTomaLaClasePorDefecto(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuiaConIngressSinClase()...)
+
+	got := kviz.ingress(t)
+
+	if len(got) != 1 || got[0].Clase == nil || *got[0].Clase != "nginx" || !got[0].ClasePorDefecto {
+		t.Fatalf("ingress = %s, want clase nginx, por defecto", mostrar(got))
+	}
 }
