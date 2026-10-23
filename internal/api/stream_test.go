@@ -116,6 +116,26 @@ func TestUnNodoNuevoLlegaComoActualizacion(t *testing.T) {
 	}
 }
 
+func TestUnEndpointQueEntraLlegaComoCambioDeSuService(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab",
+		service("default", "web", corev1.ServiceTypeClusterIP, "10.96.0.20", map[string]string{"app": "web"},
+			corev1.ServicePort{Protocol: corev1.ProtocolTCP, Port: 80}),
+	)
+	stream := kviz.abrirStream(t)
+	stream.siguiente(t)
+
+	es := endpointSlice("default", "web-abc12", "web", endpoint("10.244.1.8", "web-5d8f-a1", "lab-worker", ptrBool(true)))
+	if _, err := kviz.cliente.DiscoveryV1().EndpointSlices("default").Create(context.Background(), es, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	c := stream.esperarCambio(t, "services", "default/web")
+	var got serviceEnFoto
+	if err := json.Unmarshal(c.Valor, &got); err != nil || len(got.Endpoints) != 1 || got.Endpoints[0].IP != "10.244.1.8" {
+		t.Fatalf("cambio = %s, want el Service web con el endpoint 10.244.1.8", mostrar(c))
+	}
+}
+
 func TestCadaPestanaRecibeLasActualizaciones(t *testing.T) {
 	kviz := nuevoKviz(t, "kind-lab", nodo("lab-worker", "172.23.0.4"))
 	a, b := kviz.abrirStream(t), kviz.abrirStream(t)

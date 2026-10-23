@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { escucharFoto } from './api';
-import { construirEscena } from './escena/escena';
+import { construirEscena, namespacesDelFiltro } from './escena/escena';
 import { Lienzo } from './lienzo/Lienzo';
 import { EN_VIVO_INICIAL, type EnVivo, finDelBrillo, podsNuevos, recibir } from './tiempoReal';
 
@@ -10,6 +10,8 @@ export function App() {
   const [cortado, setCortado] = useState(false);
   // se cambia cuando termina el brillo de los pods nuevos, para volver a armar la escena sin él
   const [finBrillo, setFinBrillo] = useState(0);
+  const [mostrarSistema, setMostrarSistema] = useState(false);
+  const [namespace, setNamespace] = useState<string | null>(null);
 
   useEffect(
     () =>
@@ -31,9 +33,15 @@ export function App() {
   }, [enVivo, finBrillo]);
 
   const foto = enVivo.foto;
+  const namespaces = useMemo(() => (foto ? namespacesDelFiltro(foto, { mostrarSistema }) : []), [foto, mostrarSistema]);
+  // si el namespace elegido deja de ofrecerse (se ocultó el sistema o se fue), el filtro vuelve a "todos"
+  const filtro = namespace !== null && namespaces.includes(namespace) ? namespace : null;
   const escena = useMemo(
-    () => (foto?.conectado ? construirEscena(foto, { podsNuevos: podsNuevos(enVivo, Date.now()) }) : null),
-    [enVivo, finBrillo], // eslint-disable-line react-hooks/exhaustive-deps
+    () =>
+      foto?.conectado
+        ? construirEscena(foto, { mostrarSistema, namespace: filtro, podsNuevos: podsNuevos(enVivo, Date.now()) })
+        : null,
+    [enVivo, finBrillo, mostrarSistema, filtro], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (
@@ -46,6 +54,25 @@ export function App() {
             {foto.contexto || 'sin contexto'}
             {!foto.conectado && <span className="tenue-texto">· desconectado</span>}
           </span>
+        )}
+        {foto?.conectado && (
+          <>
+            <label className="campo">
+              namespace
+              <select value={filtro ?? ''} onChange={(e) => setNamespace(e.target.value || null)}>
+                <option value="">todos</option>
+                {namespaces.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="campo">
+              <input type="checkbox" checked={mostrarSistema} onChange={(e) => setMostrarSistema(e.target.checked)} />
+              namespaces del sistema
+            </label>
+          </>
         )}
       </header>
       {cortado && <div className="aviso">Se cortó la conexión con kviz; reintentando…</div>}

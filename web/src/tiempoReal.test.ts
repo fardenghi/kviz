@@ -20,6 +20,7 @@ const foto = (pods: Pod[]): Foto => ({
   conectado: true,
   nodos: [{ id: 'lab-worker', nombre: 'lab-worker', internalIP: '172.23.0.4' }],
   pods,
+  services: [],
 });
 
 const recibirTodos = (mensajes: Mensaje[], ahora = 0): EnVivo =>
