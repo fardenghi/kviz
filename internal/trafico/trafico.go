@@ -2,9 +2,10 @@
 // request de prueba y la foto, calcula el recorrido desde la configuración (no rastrea paquetes).
 // Es puro: no habla con el cluster ni con el pod de sondeo.
 //
-// Hoy el recorrido es el básico: Service → endpoints → pod. Para sumar pasos (DNS, puerta, regla
-// de Ingress, salto entre nodos) se agregan su tipo de paso y su cálculo en Recorrer; la interfaz
-// los dibuja por los objetos que marca cada paso, sin conocer el tipo.
+// El recorrido es DNS → puerta → regla de Ingress → Service → endpoints → salto entre nodos →
+// pod, con los pasos que correspondan al destino (recorrer.go, ingress.go); el pod y el salto se
+// suman solo cuando se sabe qué pod respondió (respuesta.go). La interfaz dibuja cada paso por los
+// objetos que marca, sin conocer el tipo.
 package trafico
 
 import (
@@ -12,6 +13,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"kviz/internal/foto"
 )
@@ -24,15 +27,19 @@ type Recorrido struct {
 
 // Tipos de paso.
 const (
+	PasoDNS       = "dns"
+	PasoPuerta    = "puerta"
+	PasoIngress   = "ingress"
 	PasoService   = "service"
 	PasoEndpoints = "endpoints"
+	PasoSalto     = "salto"
 	PasoPod       = "pod"
 )
 
 // Paso es un paso del recorrido.
 type Paso struct {
 	N int `json:"n"`
-	// Tipo: service, endpoints o pod (ver las constantes Paso…).
+	// Tipo: dns, puerta, ingress, service, endpoints, salto o pod (ver las constantes Paso…).
 	Tipo string `json:"tipo"`
 	// Titulo es la línea principal del paso: `backend 10.96.11.121:80 → :8081`.
 	Titulo string `json:"titulo"`
@@ -43,7 +50,9 @@ type Paso struct {
 }
 
 // Ref es un objeto de la foto: su tipo (service, pod, ingress, puerta, nodo) y su id en la lista
-// de la foto (`<namespace>/<nombre>` para un Service o un pod).
+// de la foto (`<namespace>/<nombre>` para un Service, pod o Ingress; `<nodo>/<puerto>/<protocolo>`
+// para una puerta; el nombre para un nodo). El paso salto marca dos nodos: de dónde sale y a dónde
+// llega, en ese orden.
 type Ref struct {
 	Tipo string `json:"tipo"`
 	ID   string `json:"id"`
@@ -85,104 +94,6 @@ func URL(destino, path string) (*url.URL, error) {
 	return u, nil
 }
 
-// Recorrer calcula el recorrido de una request a la URL según la foto. Si el host es la ClusterIP
-// o un nombre DNS de un Service, el recorrido es Service → endpoints listos.
-func Recorrer(f foto.Foto, u *url.URL) Recorrido {
-	r := Recorrido{Pasos: []Paso{}}
-	host := strings.TrimSuffix(u.Hostname(), ".")
-	puerto := puertoDe(u)
-	s := serviceDe(f, host)
-	if s == nil {
-		return r
-	}
-	ref := Ref{Tipo: "service", ID: s.ID}
-	p := puertoDelService(s, puerto)
-	if p == nil {
-		return r.con(Paso{
-			Tipo:    PasoService,
-			Titulo:  fmt.Sprintf("%s %s:%d", s.Nombre, s.ClusterIP, puerto),
-			Detalle: fmt.Sprintf("el Service no expone el puerto %d: la request no llega a ningún pod", puerto),
-			Objetos: []Ref{ref},
-		})
-	}
-	r = r.con(Paso{
-		Tipo:    PasoService,
-		Titulo:  fmt.Sprintf("%s %s:%d → :%s", s.Nombre, s.ClusterIP, puerto, p.TargetPort.String()),
-		Detalle: fmt.Sprintf("%s, targetPort %s", s.Tipo, p.TargetPort.String()),
-		Objetos: []Ref{ref},
-	})
-
-	var direcciones []string
-	pods := []Ref{}
-	noListos := 0
-	for _, e := range s.Endpoints {
-		if !e.Listo {
-			noListos++
-			continue
-		}
-		direcciones = append(direcciones, e.IP+":"+p.TargetPort.String())
-		if e.Pod != nil {
-			pods = append(pods, Ref{Tipo: "pod", ID: s.Namespace + "/" + *e.Pod})
-		}
-	}
-	paso := Paso{Tipo: PasoEndpoints, Titulo: strings.Join(direcciones, ", "), Objetos: pods}
-	switch {
-	case len(direcciones) == 0:
-		paso.Titulo = "sin endpoints listos"
-		paso.Detalle = "ningún pod listo coincide con el selector: la request no tiene a dónde ir"
-	case len(direcciones) == 1:
-		paso.Detalle = "1 endpoint listo"
-	default:
-		paso.Detalle = fmt.Sprintf("%d endpoints listos; kube-proxy elige uno", len(direcciones))
-	}
-	if noListos > 0 {
-		if noListos == 1 {
-			paso.Detalle += "; 1 no listo, que no recibe tráfico"
-		} else {
-			paso.Detalle += fmt.Sprintf("; %d no listos, que no reciben tráfico", noListos)
-		}
-	}
-	return r.con(paso)
-}
-
-// PodQueRespondio es el pod de los endpoints del recorrido que respondió, si kviz lo puede saber:
-// cuando el body de la respuesta trae su nombre. nil si no se sabe.
-func PodQueRespondio(f foto.Foto, r Recorrido, body string) *foto.Pod {
-	var elegido *foto.Pod
-	for _, paso := range r.Pasos {
-		if paso.Tipo != PasoEndpoints {
-			continue
-		}
-		for _, o := range paso.Objetos {
-			p := podDe(f, o.ID)
-			// el nombre más largo gana: un pod no se confunde con otro cuyo nombre es un prefijo del suyo
-			if p != nil && strings.Contains(body, p.Nombre) && (elegido == nil || len(p.Nombre) > len(elegido.Nombre)) {
-				elegido = p
-			}
-		}
-	}
-	return elegido
-}
-
-// ConRespuesta completa el recorrido con la respuesta: si se sabe qué pod respondió, el último
-// paso es ese pod. Si no, el recorrido termina en los endpoints posibles.
-func ConRespuesta(f foto.Foto, r Recorrido, body string) Recorrido {
-	p := PodQueRespondio(f, r, body)
-	if p == nil {
-		return r
-	}
-	ip := "sin IP"
-	if p.IP != nil {
-		ip = *p.IP
-	}
-	return r.con(Paso{
-		Tipo:    PasoPod,
-		Titulo:  p.Nombre + " " + ip,
-		Detalle: "Conocido: el body de la respuesta trae el nombre del pod",
-		Objetos: []Ref{{Tipo: "pod", ID: p.ID}},
-	})
-}
-
 func (r Recorrido) con(p Paso) Recorrido {
 	p.N = len(r.Pasos) + 1
 	if p.Objetos == nil {
@@ -216,10 +127,15 @@ func serviceDe(f foto.Foto, host string) *foto.Service {
 	return nil
 }
 
-func puertoDelService(s *foto.Service, puerto int32) *foto.PuertoService {
+// puertoDelService es el puerto TCP del Service con ese número, o con ese nombre (una regla de
+// Ingress puede nombrarlo).
+func puertoDelService(s *foto.Service, puerto intstr.IntOrString) *foto.PuertoService {
 	for i := range s.Puertos {
 		p := &s.Puertos[i]
-		if p.Puerto == puerto && (p.Protocolo == "" || p.Protocolo == "TCP") {
+		if p.Protocolo != "" && p.Protocolo != "TCP" {
+			continue
+		}
+		if (puerto.Type == intstr.Int && p.Puerto == puerto.IntVal) || (puerto.Type == intstr.String && p.Nombre == puerto.StrVal) {
 			return p
 		}
 	}

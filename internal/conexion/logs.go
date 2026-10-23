@@ -25,6 +25,10 @@ type PedidoDeLogs struct {
 	// Anterior pide los logs del reinicio anterior (kubectl logs --previous); si no, los actuales,
 	// que siguen en vivo (kubectl logs -f) hasta que se cancela ctx o el container termina.
 	Anterior bool
+	// SinSeguir pide solo lo que ya está en los logs actuales, sin seguir en vivo.
+	SinSeguir bool
+	// Ultimas es cuántas líneas del final traer; 0 es LineasDeLogs.
+	Ultimas int64
 }
 
 // Logs abre los logs de un container del cluster conectado, una línea por renglón. Hay que
@@ -37,9 +41,12 @@ func (g *Gestor) Logs(ctx context.Context, p PedidoDeLogs) (io.ReadCloser, error
 		return nil, ErrDesconectado
 	}
 	cola := int64(LineasDeLogs)
+	if p.Ultimas > 0 {
+		cola = p.Ultimas
+	}
 	opciones := &corev1.PodLogOptions{
 		Container: p.Container,
-		Follow:    !p.Anterior,
+		Follow:    !p.Anterior && !p.SinSeguir,
 		Previous:  p.Anterior,
 		TailLines: &cola,
 	}

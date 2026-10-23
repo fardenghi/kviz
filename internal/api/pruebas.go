@@ -10,14 +10,20 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"kviz/internal/conexion"
+	"kviz/internal/foto"
 	"kviz/internal/sondeo"
 	"kviz/internal/trafico"
 )
@@ -97,9 +103,21 @@ func mandarPrueba(cluster Cluster, ids *atomic.Int64) http.HandlerFunc {
 			return
 		}
 
+		// si la request pasa por el Ingress Controller, lleva un X-Request-ID para encontrarla
+		// después en su log y saber a qué pod la mandó
+		host := trafico.ConHost(valorDe(p.Headers, "Host"))
+		headers := p.Headers
+		idDeRequest := ""
+		if len(trafico.PodsDelIngressController(trafico.Recorrer(cluster.Foto(), u, host))) > 0 {
+			if idDeRequest = valorDe(headers, trafico.HeaderDeRequest); idDeRequest == "" {
+				idDeRequest = nuevoIDDeRequest()
+				headers = append(slices.Clone(headers), sondeo.Header{Nombre: trafico.HeaderDeRequest, Valor: idDeRequest})
+			}
+		}
+
 		ctx, cancelar := context.WithTimeout(r.Context(), esperaPrueba)
 		defer cancelar()
-		res, pod, err := s.HTTP(ctx, sondeo.PedidoHTTP{Metodo: metodo, URL: u.String(), Headers: p.Headers, Body: p.Body})
+		res, pod, err := s.HTTP(ctx, sondeo.PedidoHTTP{Metodo: metodo, URL: u.String(), Headers: headers, Body: p.Body})
 		var sinRespuesta sondeo.SinRespuesta
 		if err != nil && !errors.As(err, &sinRespuesta) {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
@@ -114,7 +132,7 @@ func mandarPrueba(cluster Cluster, ids *atomic.Int64) http.HandlerFunc {
 			URL:       u.String(),
 			Metodo:    metodo,
 			Origen:    origen(pod),
-			Recorrido: trafico.Recorrer(f, u),
+			Recorrido: trafico.Recorrer(f, u, host),
 		}
 		if err != nil {
 			out.Error = sinRespuesta.Motivo
@@ -129,10 +147,91 @@ func mandarPrueba(cluster Cluster, ids *atomic.Int64) http.HandlerFunc {
 			if out.Respuesta.Headers == nil {
 				out.Respuesta.Headers = []sondeo.Header{}
 			}
-			out.Recorrido = trafico.ConRespuesta(f, out.Recorrido, res.Body)
+			out.Recorrido = conPodQueRespondio(ctx, cluster, f, out.Recorrido, res.Body, idDeRequest)
 		}
 		responderJSON(w, out)
 	}
+}
+
+// conPodQueRespondio completa el recorrido con el pod que respondió, si se sabe: por el body o,
+// si pasó por el Ingress Controller, por la línea de su log con el X-Request-ID de la request.
+func conPodQueRespondio(ctx context.Context, cluster Cluster, f foto.Foto, r trafico.Recorrido, body, idDeRequest string) trafico.Recorrido {
+	if trafico.PodQueRespondio(f, r, body) != nil || idDeRequest == "" {
+		return trafico.ConRespuesta(f, r, body)
+	}
+	if upstream := upstreamDelIngressController(ctx, cluster, f, r, idDeRequest); upstream != "" {
+		return trafico.ConUpstream(f, r, upstream)
+	}
+	return r
+}
+
+// esperaLogDelIC es cuánto se espera a que la línea de la request aparezca en el log del Ingress
+// Controller (nginx la escribe al terminar la request, y el log llega un poco después).
+const (
+	esperaLogDelIC    = 2 * time.Second
+	intervaloLogDelIC = 100 * time.Millisecond
+)
+
+// upstreamDelIngressController busca en el final del log de los pods del Ingress Controller del
+// recorrido la línea de la request y devuelve el endpoint al que la mandó; "" si no aparece.
+func upstreamDelIngressController(ctx context.Context, cluster Cluster, f foto.Foto, r trafico.Recorrido, idDeRequest string) string {
+	limite := time.Now().Add(esperaLogDelIC)
+	for {
+		for _, ref := range trafico.PodsDelIngressController(r) {
+			pedido, ok := pedidoDeLogDelIC(f, ref.ID)
+			if !ok {
+				continue
+			}
+			logs, err := cluster.Logs(ctx, pedido)
+			if err != nil {
+				continue
+			}
+			texto, _ := io.ReadAll(io.LimitReader(logs, 1<<20))
+			logs.Close()
+			if upstream := trafico.UpstreamDelLog(strings.Split(string(texto), "\n"), idDeRequest); upstream != "" {
+				return upstream
+			}
+		}
+		if time.Now().After(limite) {
+			return ""
+		}
+		select {
+		case <-ctx.Done():
+			return ""
+		case <-time.After(intervaloLogDelIC):
+		}
+	}
+}
+
+// pedidoDeLogDelIC pide las últimas líneas del log del primer container normal del pod.
+func pedidoDeLogDelIC(f foto.Foto, id string) (conexion.PedidoDeLogs, bool) {
+	for _, p := range f.Pods {
+		if p.ID != id {
+			continue
+		}
+		for _, c := range p.Containers {
+			if c.Tipo == "normal" {
+				return conexion.PedidoDeLogs{Namespace: p.Namespace, Pod: p.Nombre, Container: c.Nombre, SinSeguir: true, Ultimas: 200}, true
+			}
+		}
+	}
+	return conexion.PedidoDeLogs{}, false
+}
+
+// valorDe es el valor del header (sin importar mayúsculas), o "".
+func valorDe(headers []sondeo.Header, nombre string) string {
+	for _, h := range headers {
+		if strings.EqualFold(h.Nombre, nombre) {
+			return h.Valor
+		}
+	}
+	return ""
+}
+
+func nuevoIDDeRequest() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return "kviz-" + hex.EncodeToString(b)
 }
 
 func origen(p sondeo.Pod) string {

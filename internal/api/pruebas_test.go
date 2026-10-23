@@ -361,6 +361,8 @@ type sondeoDePrueba struct {
 	mu        sync.Mutex
 	guion     func(sondeo.PedidoHTTP) (sondeo.RespuestaHTTP, error)
 	historial []ejecucion
+	// observador, si hay, ve cada request antes de que se responda (el Ingress Controller falso la anota en su log).
+	observador func(sondeo.PedidoHTTP)
 }
 
 type ejecucion struct {
@@ -389,7 +391,17 @@ func (s *sondeoDePrueba) HTTP(_ context.Context, pod sondeo.Pod, p sondeo.Pedido
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.historial = append(s.historial, ejecucion{pod: pod, pedido: p})
+	if s.observador != nil {
+		s.observador(p)
+	}
 	return s.guion(p)
+}
+
+// alEjecutar hace que o vea cada request de prueba que ejecuta el pod de sondeo.
+func (s *sondeoDePrueba) alEjecutar(o func(sondeo.PedidoHTTP)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.observador = o
 }
 
 func (s *sondeoDePrueba) ejecutados() []ejecucion {
