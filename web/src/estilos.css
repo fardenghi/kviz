@@ -146,3 +146,18 @@ g.objeto { cursor: pointer; transition: opacity .15s; }
 .comando-linea { display: flex; align-items: center; gap: 6px; background: var(--fondo); border-radius: 6px; padding: 4px 6px; }
 .comando-linea code { flex: 1; font-family: var(--mono); font-size: 11px; word-break: break-all; user-select: all; }
 .comando-linea .boton { flex: none; }
+
+/* panel de detalle: env, ConfigMaps, Secrets y volúmenes (ticket 10) */
+.variable, .volumen { margin: 3px 0 6px; }
+.variable-linea { display: flex; gap: 8px; align-items: baseline; }
+.variable-nombre { flex: none; font-weight: 600; }
+.variable-valor { min-width: 0; word-break: break-all; }
+.variable-origen { font-size: 11px; }
+.origen { border: 1px solid var(--linea); border-radius: 4px; padding: 0 4px; }
+.origen-Secret { border-color: var(--aviso); color: var(--aviso); }
+.falta { color: var(--mal); }
+.valor-revelado { background: #fff6e0; border-radius: 3px; padding: 0 3px; }
+.montaje { padding-left: 12px; font-size: 11px; }
+.contenido { margin: 4px 0 2px 12px; padding: 4px 6px; background: var(--fondo); border-radius: 6px; }
+.contenido-clave { font-weight: 600; }
+.contenido-valor { margin: 2px 0 4px; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; }
