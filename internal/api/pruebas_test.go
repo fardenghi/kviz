@@ -365,6 +365,9 @@ type sondeoDePrueba struct {
 	historial []ejecucion
 	// observador, si hay, ve cada request antes de que se responda (el Ingress Controller falso la anota en su log).
 	observador func(sondeo.PedidoHTTP)
+	// las pruebas de conexión TCP, aparte de las requests
+	guionTCP   func(sondeo.PedidoTCP) (sondeo.ResultadoTCP, error)
+	conexiones []sondeo.PedidoTCP
 }
 
 type ejecucion struct {
@@ -373,9 +376,14 @@ type ejecucion struct {
 }
 
 func nuevoSondeoDePrueba() *sondeoDePrueba {
-	return &sondeoDePrueba{guion: func(sondeo.PedidoHTTP) (sondeo.RespuestaHTTP, error) {
-		return sondeo.RespuestaHTTP{Status: 200}, nil
-	}}
+	return &sondeoDePrueba{
+		guion: func(sondeo.PedidoHTTP) (sondeo.RespuestaHTTP, error) {
+			return sondeo.RespuestaHTTP{Status: 200}, nil
+		},
+		guionTCP: func(sondeo.PedidoTCP) (sondeo.ResultadoTCP, error) {
+			return sondeo.ResultadoTCP{Resultado: sondeo.Abre}, nil
+		},
+	}
 }
 
 // responder hace que todas las requests de prueba reciban esta respuesta.
@@ -410,6 +418,31 @@ func (s *sondeoDePrueba) ejecutados() []ejecucion {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return slices.Clone(s.historial)
+}
+
+// conectar hace que todas las pruebas de conexión TCP den este resultado.
+func (s *sondeoDePrueba) conectar(r sondeo.ResultadoTCP) {
+	s.guionarConexion(func(sondeo.PedidoTCP) (sondeo.ResultadoTCP, error) { return r, nil })
+}
+
+func (s *sondeoDePrueba) guionarConexion(g func(sondeo.PedidoTCP) (sondeo.ResultadoTCP, error)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.guionTCP = g
+}
+
+func (s *sondeoDePrueba) TCP(_ context.Context, _ sondeo.Pod, p sondeo.PedidoTCP) (sondeo.ResultadoTCP, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.conexiones = append(s.conexiones, p)
+	return s.guionTCP(p)
+}
+
+// conexionesEjecutadas son las pruebas de conexión TCP que ejecutó el pod de sondeo.
+func (s *sondeoDePrueba) conexionesEjecutadas() []sondeo.PedidoTCP {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.conexiones)
 }
 
 // mandarPrueba manda una request de prueba como el formulario de la interfaz.

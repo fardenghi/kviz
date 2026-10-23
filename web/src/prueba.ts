@@ -6,11 +6,17 @@ export interface Header {
   valor: string;
 }
 
+/** Request de prueba HTTP o prueba de conexión TCP. */
+export type TipoDePrueba = 'http' | 'tcp';
+
 /** Lo que manda el formulario. */
 export interface PedidoDePrueba {
-  /** "http" por defecto. */
-  tipo?: 'http';
-  /** `host[:puerto]` o una URL: `backend.default.svc.cluster.local:80`, `10.96.11.121`, `backend.default/hello`. */
+  /** "http" por defecto. "tcp" es una prueba de conexión: solo usa `destino`. */
+  tipo?: TipoDePrueba;
+  /**
+   * `host[:puerto]` o una URL: `backend.default.svc.cluster.local:80`, `10.96.11.121`, `backend.default/hello`.
+   * En una prueba de conexión, `host:puerto` (`postgres.default:5432`).
+   */
   destino: string;
   /** GET por defecto. */
   metodo?: string;
@@ -25,18 +31,21 @@ export interface PedidoDePrueba {
 /** Tope de repeticiones de una request de prueba (maxRepeticiones en internal/api/pruebas.go). */
 export const MAX_REPETICIONES = 20;
 
-/** Una request de prueba ya ejecutada desde el pod de sondeo. */
+/** Una request de prueba (o prueba de conexión) ya ejecutada desde el pod de sondeo. */
 export interface Prueba {
   /** Numera las pruebas de la sesión. */
   id: number;
-  tipo: 'http';
-  /** La URL que ejecutó el pod de sondeo. */
+  tipo: TipoDePrueba;
+  /** La URL que ejecutó el pod de sondeo; `tcp://host:puerto` en una prueba de conexión. */
   url: string;
+  /** Vacío en una prueba de conexión. */
   metodo: string;
   /** El pod de sondeo del que salió: `pod de sondeo kviz-sondeo-x (kviz-system, lab-worker)`. */
   origen: string;
   /** null si no hubo respuesta; entonces `error` dice por qué (conexión rechazada, timeout…). */
   respuesta: RespuestaHTTP | null;
+  /** Solo en una prueba de conexión; si falta, `error` dice por qué no se pudo intentar. */
+  conexion?: ConexionTCP;
   error?: string;
   recorrido: Recorrido;
   /** Contexto de kubectl en el que se mandó (el historial dura toda la sesión). */
@@ -57,6 +66,15 @@ export interface Reparto {
   sinIdentificar: number;
   /** Requests que no recibieron respuesta. */
   sinRespuesta: number;
+}
+
+/** Resultado de una prueba de conexión TCP. */
+export interface ConexionTCP {
+  resultado: 'abre' | 'rechaza' | 'timeout';
+  /** Lo que tardó en abrirse, en ser rechazada o en vencer, medido en el pod de sondeo. */
+  ms: number;
+  /** El mensaje del pod de sondeo cuando no abre. */
+  motivo?: string;
 }
 
 export interface RespuestaHTTP {
@@ -92,6 +110,11 @@ export interface RefObjeto {
   tipo: string;
   /** El `id` del objeto en su lista de la foto (`default/backend`, `lab-worker2/80/TCP`…). */
   id: string;
+}
+
+/** Lo que se probó, en una línea: `POST http://backend.default/hello` o `TCP postgres.default:5432`. */
+export function lineaDelPedido(p: Prueba): string {
+  return p.tipo === 'tcp' ? `TCP ${p.url.replace(/^tcp:\/\//, '')}` : `${p.metodo} ${p.url}`;
 }
 
 /** Headers escritos uno por línea como `Nombre: valor`; las líneas sin `:` se ignoran. */

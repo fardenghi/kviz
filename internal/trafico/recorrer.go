@@ -43,7 +43,7 @@ func Recorrer(f foto.Foto, u *url.URL, ops ...Opcion) Recorrido {
 	for _, op := range ops {
 		op(&o)
 	}
-	c := calculo{f: f, host: o.host, path: u.EscapedPath(), r: Recorrido{Pasos: []Paso{}}}
+	c := calculo{f: f, http: u.Scheme != "tcp", host: o.host, path: u.EscapedPath(), r: Recorrido{Pasos: []Paso{}}}
 	if c.path == "" {
 		c.path = "/"
 	}
@@ -70,6 +70,9 @@ func Recorrer(f foto.Foto, u *url.URL, ops ...Opcion) Recorrido {
 // calculo es un recorrido a medio armar, con lo que hace falta para seguirlo.
 type calculo struct {
 	f foto.Foto
+	// http es falso en una prueba de conexión (`tcp://`): sin path ni Host, no hay regla de
+	// Ingress, y la conexión termina en el pod del Ingress Controller.
+	http bool
 	// host y path con los que el Ingress Controller elige la regla.
 	host, path string
 	r          Recorrido
@@ -124,7 +127,7 @@ func (c *calculo) desdeNodo(n *foto.Nodo, puerto int32) {
 		c.con(paso)
 		return
 	}
-	if esIngressController(p) {
+	if c.http && esIngressController(p) {
 		paso.Detalle = "Entra al Ingress Controller " + p.Nombre
 		c.con(paso)
 		c.desdeIngressController([]*foto.Pod{p})
@@ -201,7 +204,7 @@ func (c *calculo) desdeService(s *foto.Service, puerto intstr.IntOrString, ics [
 	c.con(endpoints)
 
 	// el Service del Ingress Controller: la request sigue por una regla de Ingress
-	if ics == nil && len(listos) > 0 && len(listos) == len(direcciones) {
+	if c.http && ics == nil && len(listos) > 0 && len(listos) == len(direcciones) {
 		for _, l := range listos {
 			if !esIngressController(l) {
 				return

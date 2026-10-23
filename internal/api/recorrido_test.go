@@ -188,6 +188,37 @@ func TestUnPathSinReglaDeIngressTerminaEnElIngressController(t *testing.T) {
 	}
 }
 
+func TestUnaPruebaDeConexionPorLaPuertaDelIngressControllerNoPasaPorLasReglasDeIngress(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuia()...)
+	kviz.sondeo.conectar(sondeo.ResultadoTCP{Resultado: sondeo.Abre})
+
+	// una conexión TCP no tiene path ni Host: llega al pod del hostPort y ahí termina
+	_, got := kviz.mandarConexion(t, pedidoDePrueba{Tipo: "tcp", Destino: "lab-worker2:80"})
+
+	want := []pasoJSON{
+		{N: 1, Tipo: "dns", Titulo: "lab-worker2 → 172.23.0.3", Detalle: "Nombre de un nodo: el DNS lo resuelve a su InternalIP",
+			Objetos: []refJSON{{Tipo: "nodo", ID: "lab-worker2"}}},
+		{N: 2, Tipo: "puerta", Titulo: "lab-worker2 :80 (hostPort)", Detalle: "Entra directo al pod " + podDelIC + " (hostPort 80 → :80)",
+			Objetos: []refJSON{{Tipo: "puerta", ID: "lab-worker2/80/TCP"}}},
+		{N: 3, Tipo: "pod", Titulo: podDelIC + " 10.244.2.2:80", Detalle: "Conocido: un hostPort lleva a un solo pod",
+			Objetos: []refJSON{{Tipo: "pod", ID: "ingress-nginx/" + podDelIC}}},
+	}
+	if !reflect.DeepEqual(got.Recorrido.Pasos, want) {
+		t.Fatalf("recorrido = %s\nwant %s", mostrar(got.Recorrido.Pasos), mostrar(want))
+	}
+}
+
+func TestUnaPruebaDeConexionAUnNodePortPorUnNodo(t *testing.T) {
+	kviz := nuevoKviz(t, "kind-lab", clusterDeLaGuia()...)
+	kviz.sondeo.conectar(sondeo.ResultadoTCP{Resultado: sondeo.Abre})
+
+	_, got := kviz.mandarConexion(t, pedidoDePrueba{Tipo: "tcp", Destino: "lab-worker:30010"})
+
+	if tipos := tiposDePasos(got.pruebaJSON); !reflect.DeepEqual(tipos, []string{"dns", "puerta", "service", "endpoints"}) {
+		t.Fatalf("pasos = %s, want DNS, puerta, Service y endpoints", mostrar(got.Recorrido.Pasos))
+	}
+}
+
 func tiposDePasos(p pruebaJSON) []string {
 	tipos := []string{}
 	for _, paso := range p.Recorrido.Pasos {
