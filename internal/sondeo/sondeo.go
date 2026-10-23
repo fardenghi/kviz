@@ -1,4 +1,4 @@
-// Package sondeo es el pod de sondeo (módulo 10 de la spec, ADR 0001): un pod temporal en
+// Package sondeo es el pod de sondeo: un pod temporal en
 // kviz-system desde el que salen las requests de prueba, porque desde la máquina local no se llega
 // a las IPs internas del cluster.
 //

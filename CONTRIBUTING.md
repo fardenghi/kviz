@@ -1,9 +1,7 @@
 # Contributing to kviz
 
 kviz is a single Go binary (the backend, built on client-go) that embeds a React + TypeScript UI
-built with Vite. The code, comments and UI are in Spanish; the domain vocabulary is defined in
-[docs/GLOSSARY.md](docs/GLOSSARY.md) and the main architecture decision in
-[docs/adr/](docs/adr/). A few words you will meet everywhere:
+built with Vite. The code, comments and UI are in Spanish. A few words you will meet everywhere:
 
 - **foto** (snapshot): the model of the cluster that the backend builds from Kubernetes objects and
   sends to the UI as JSON.

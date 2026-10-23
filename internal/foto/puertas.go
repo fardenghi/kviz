@@ -16,7 +16,7 @@ type HostPort struct {
 	ContainerPort int32  `json:"containerPort"`
 }
 
-// Puerta es un puerto abierto en un nodo hacia el cluster (ver GLOSSARY.md): un NodePort, que se
+// Puerta es un puerto abierto en un nodo hacia el cluster: un NodePort, que se
 // abre en todos los nodos, o un hostPort, que se abre solo en el nodo de su pod.
 type Puerta struct {
 	// ID es "<nodo>/<puerto>/<protocolo>": en un nodo, un puerto y protocolo abre una sola puerta.

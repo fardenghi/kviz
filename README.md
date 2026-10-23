@@ -114,11 +114,9 @@ rebinding attack, can't read it), rejects state-changing requests coming from an
 requires JSON bodies on its POSTs, so other pages open in your browser can't use it either. The history of test requests lives
 only in memory and is lost when kviz exits.
 
-## Documentation
+## Contributing
 
-- [docs/GLOSSARY.md](docs/GLOSSARY.md): the vocabulary kviz uses (in Spanish).
-- [docs/adr/](docs/adr/): architecture decisions, such as why kviz runs locally with a probe pod.
-- [CONTRIBUTING.md](CONTRIBUTING.md): building, testing and finding your way around the code.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for building, testing and finding your way around the code.
 
 ## License
 
