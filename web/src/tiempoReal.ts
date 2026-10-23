@@ -30,25 +30,27 @@ const DURACION_BRILLO = BRILLO_POD_NUEVO.veces * BRILLO_POD_NUEVO.msPorVez;
 export interface EnVivo {
   /** null hasta que llega la primera foto. */
   foto: Foto | null;
+  /** La foto de antes del último mensaje, para marcar lo que cambió (reinicios que aumentaron). */
+  anterior: Foto | null;
   /** Pods que aparecieron por una actualización (id de escena → instante en ms). */
   nuevos: ReadonlyMap<string, number>;
 }
 
-export const EN_VIVO_INICIAL: EnVivo = { foto: null, nuevos: new Map() };
+export const EN_VIVO_INICIAL: EnVivo = { foto: null, anterior: null, nuevos: new Map() };
 
 /** Aplica un mensaje del stream. `ahora` es el instante en ms (Date.now()). */
 export function recibir(estado: EnVivo, m: Mensaje, ahora: number): EnVivo {
   switch (m.tipo) {
     case 'foto':
       // una foto completa no es "lo que apareció": al cargar o reconectar no brilla nada
-      return { foto: m.foto, nuevos: new Map() };
+      return { foto: m.foto, anterior: estado.foto, nuevos: new Map() };
     case 'cambios': {
       if (!estado.foto) return estado;
       const foto = aplicarCambios(estado.foto, m.cambios);
       const antes = new Set(estado.foto.pods.map(idPod));
       const nuevos = new Map([...estado.nuevos].filter(([, desde]) => ahora - desde < DURACION_BRILLO));
       for (const p of foto.pods) if (!antes.has(idPod(p))) nuevos.set(idPod(p), ahora);
-      return { foto, nuevos };
+      return { foto, anterior: estado.foto, nuevos };
     }
     default:
       return estado; // un tipo de mensaje que esta versión no conoce

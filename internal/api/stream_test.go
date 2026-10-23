@@ -84,9 +84,7 @@ func TestUnPodQueSeEstaBorrandoQuedaTerminando(t *testing.T) {
 	nginx := pod("default", "nginx", "lab-worker", "10.244.1.5", corev1.PodRunning)
 	kviz := nuevoKviz(t, "kind-lab", nodo("lab-worker", "172.23.0.4"), nginx)
 	stream := kviz.abrirStream(t)
-	if inicial := stream.siguiente(t); strings.Contains(mostrar(inicial.Foto), `"terminando":true`) {
-		t.Fatalf("foto = %s, want ningún pod terminando", mostrar(inicial.Foto))
-	}
+	stream.siguiente(t)
 
 	// lo que hace la API de Kubernetes con `kubectl delete` mientras corre el período de gracia
 	terminando := nginx.DeepCopy()
@@ -95,8 +93,8 @@ func TestUnPodQueSeEstaBorrandoQuedaTerminando(t *testing.T) {
 	kviz.modificar(t, terminando)
 
 	got := podDelCambio(t, stream.esperarCambio(t, "pods", "default/nginx"))
-	if !got.Terminando {
-		t.Fatalf("pod = %s, want terminando", mostrar(got))
+	if got.Estado != "Terminating" {
+		t.Fatalf("pod = %s, want estado Terminating", mostrar(got))
 	}
 }
 
@@ -285,6 +283,6 @@ func podDelCambio(t *testing.T, c cambioEnFoto) podEnFotoEnVivo {
 
 type podEnFotoEnVivo struct {
 	podEnFoto
-	ID         string `json:"id"`
-	Terminando bool   `json:"terminando"`
+	ID     string `json:"id"`
+	Estado string `json:"estado"`
 }

@@ -46,9 +46,11 @@ type Pod struct {
 	IP *string `json:"ip"`
 	// Fase es status.phase: Pending, Running, Succeeded, Failed o Unknown.
 	Fase string `json:"fase"`
-	// Terminando es true mientras el pod se está borrando (`Terminating` en kubectl): tiene
-	// deletionTimestamp y todavía no desapareció.
-	Terminando bool `json:"terminando"`
+	// Estado es la columna STATUS de kubectl get pods: Running, Init:0/1, CrashLoopBackOff,
+	// Completed, Terminating…
+	Estado string `json:"estado"`
+	// Containers en orden de vida: init, normales y ephemeral.
+	Containers []Container `json:"containers"`
 }
 
 // Service es un Service con sus endpoints, tomados de sus EndpointSlices.
@@ -112,7 +114,8 @@ func Construir(contexto string, o Objetos) Foto {
 			Nodo:       opcional(p.Spec.NodeName),
 			IP:         opcional(p.Status.PodIP),
 			Fase:       string(p.Status.Phase),
-			Terminando: p.DeletionTimestamp != nil,
+			Estado:     estadoPod(p),
+			Containers: containers(p),
 		})
 	}
 	sort.Slice(f.Pods, func(i, j int) bool { return f.Pods[i].ID < f.Pods[j].ID })

@@ -12,7 +12,8 @@ const pod = (nombre: string, parte: Partial<Pod> = {}): Pod => ({
   nodo: 'lab-worker',
   ip: '10.244.1.5',
   fase: 'Running',
-  terminando: false,
+  estado: 'Running',
+  containers: [],
   ...parte,
 });
 const foto = (pods: Pod[]): Foto => ({
@@ -26,7 +27,8 @@ const foto = (pods: Pod[]): Foto => ({
 const recibirTodos = (mensajes: Mensaje[], ahora = 0): EnVivo =>
   mensajes.reduce((e, m) => recibir(e, m, ahora), EN_VIVO_INICIAL);
 
-const escenaEn = (e: EnVivo, ahora: number) => construirEscena(e.foto!, { podsNuevos: podsNuevos(e, ahora) });
+const escenaEn = (e: EnVivo, ahora: number) =>
+  construirEscena(e.foto!, { fotoAnterior: e.anterior ?? undefined, podsNuevos: podsNuevos(e, ahora) });
 const enEscena = (e: EnVivo, ahora: number, nombre: string) => escenaEn(e, ahora).pods.find((p) => p.nombre === nombre)!;
 
 describe('pods nuevos', () => {
@@ -71,7 +73,7 @@ describe('pods Terminating', () => {
   it('atenúa el pod que pasa a Terminating hasta que desaparece de la foto', () => {
     const terminando = recibirTodos([
       { tipo: 'foto', foto: foto([pod('nginx'), pod('web-1')]) },
-      { tipo: 'cambios', cambios: [{ seccion: 'pods', id: 'default/web-1', valor: pod('web-1', { terminando: true }) }] },
+      { tipo: 'cambios', cambios: [{ seccion: 'pods', id: 'default/web-1', valor: pod('web-1', { estado: 'Terminating' }) }] },
     ]);
 
     expect(enEscena(terminando, 0, 'web-1').terminando).toBe(true);
@@ -103,5 +105,25 @@ describe('cambios de la foto', () => {
       ['c', '10.244.1.9'],
     ]);
     expect(e.foto).toMatchObject({ conectado: false, motivo: 'el cluster no responde' });
+  });
+});
+
+describe('foto anterior', () => {
+  it('recuerda la foto de antes de la última actualización, para que titilen los reinicios que aumentan', () => {
+    const conReinicios = (n: number) =>
+      pod('api', {
+        containers: [
+          { nombre: 'api', tipo: 'normal', imagen: 'api:1', puertos: [], estado: 'Running', ready: true, started: true, reinicios: n },
+        ],
+      });
+    const e = recibirTodos([
+      { tipo: 'foto', foto: foto([conReinicios(1), pod('nginx')]) },
+      { tipo: 'cambios', cambios: [{ seccion: 'pods', id: 'default/api', valor: conReinicios(2) }] },
+    ]);
+
+    expect(enEscena(e, 0, 'api')).toMatchObject({ reinicios: 2, reiniciosTitilan: true });
+
+    const otro = recibir(e, { tipo: 'cambios', cambios: [{ seccion: 'pods', id: 'default/nginx', valor: pod('nginx', { ip: null }) }] }, 0);
+    expect(enEscena(otro, 0, 'api').reiniciosTitilan).toBe(false);
   });
 });

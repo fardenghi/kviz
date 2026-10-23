@@ -39,7 +39,12 @@ export function App() {
   const escena = useMemo(
     () =>
       foto?.conectado
-        ? construirEscena(foto, { mostrarSistema, namespace: filtro, podsNuevos: podsNuevos(enVivo, Date.now()) })
+        ? construirEscena(foto, {
+            fotoAnterior: enVivo.anterior ?? undefined,
+            mostrarSistema,
+            namespace: filtro,
+            podsNuevos: podsNuevos(enVivo, Date.now()),
+          })
         : null,
     [enVivo, finBrillo, mostrarSistema, filtro], // eslint-disable-line react-hooks/exhaustive-deps
   );
