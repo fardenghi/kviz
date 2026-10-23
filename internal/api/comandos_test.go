@@ -194,13 +194,3 @@ func TestUnContextoConEspaciosVaEntreComillasParaPegarloEnLaTerminal(t *testing.
 		t.Errorf("describe = %q, want %q", got[0], want)
 	}
 }
-
-func TestSinContextoDeKubectlLosComandosNoLlevanContext(t *testing.T) {
-	kviz := nuevoKviz(t, "", clusterDeLaGuia()...)
-
-	mismosComandos(t, kviz.comandos(t, "Service", "default", "backend"), []string{
-		"kubectl port-forward service/backend 8080:80 -n default",
-		"kubectl get endpointslices -l kubernetes.io/service-name=backend -n default",
-		"kubectl describe service backend -n default",
-	})
-}

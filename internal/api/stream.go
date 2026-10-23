@@ -15,7 +15,9 @@ import (
 
 // Tipos de mensaje del stream de la foto (GET /api/stream).
 const (
-	// MensajeFoto trae la foto completa: es el primer mensaje al conectarse.
+	// MensajeFoto trae la foto completa: es el primer mensaje al conectarse, y llega de nuevo
+	// cuando la foto pasa a ser de otro cluster (cambio de contexto) o kviz se desconecta o se
+	// reconecta.
 	MensajeFoto = "foto"
 	// MensajeCambios trae lo que cambió de la foto desde el mensaje anterior (ver foto.Cambio).
 	MensajeCambios = "cambios"
@@ -86,6 +88,13 @@ func transmitirFoto(cluster Cluster) http.HandlerFunc {
 			case <-time.After(juntarAvisos):
 			}
 			nueva := cluster.Foto()
+			if otroCluster(ultima, nueva) {
+				ultima = nueva
+				if s.enviar(mensaje{Tipo: MensajeFoto, Foto: &nueva}) != nil {
+					return
+				}
+				continue
+			}
 			cambios := foto.Comparar(ultima, nueva)
 			ultima = nueva
 			if len(cambios) == 0 {
@@ -96,4 +105,10 @@ func transmitirFoto(cluster Cluster) http.HandlerFunc {
 			}
 		}
 	}
+}
+
+// otroCluster dice si la foto nueva ya no es la continuación de la anterior: cambió el contexto,
+// o kviz se desconectó o se reconectó (un cluster recreado es otro cluster con el mismo nombre).
+func otroCluster(antes, despues foto.Foto) bool {
+	return antes.Contexto != despues.Contexto || antes.Conectado != despues.Conectado
 }

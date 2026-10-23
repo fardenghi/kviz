@@ -8,6 +8,31 @@ export async function pedirFoto(): Promise<Foto> {
   return res.json();
 }
 
+/** Los contextos de kubectl (GET /api/contextos). Espejo de internal/api/contexto.go. */
+export interface Contextos {
+  /** El contexto de kviz ("" si no hay). Puede faltar en `contextos` si se borró su cluster. */
+  actual: string;
+  contextos: string[];
+  /** Por qué no se pudo leer el kubeconfig. */
+  error?: string;
+}
+
+export async function pedirContextos(): Promise<Contextos> {
+  const res = await fetch('/api/contextos');
+  if (!res.ok) throw new Error(`GET /api/contextos respondió ${res.status}`);
+  return res.json();
+}
+
+/** Cambia de contexto en caliente; la foto del nuevo cluster llega por el stream. */
+export async function cambiarContexto(contexto: string): Promise<void> {
+  const res = await fetch('/api/contexto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contexto }),
+  });
+  if (!res.ok) throw new Error((await res.text()).trim() || `POST /api/contexto respondió ${res.status}`);
+}
+
 const REINTENTO_MS = 2000;
 
 /**

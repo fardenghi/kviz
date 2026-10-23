@@ -1,8 +1,9 @@
 // Package conexion es la conexión al cluster (módulo 1 de la spec): resuelve el contexto de
-// kubectl y mantiene watches (informers) de los objetos que necesita la foto.
+// kubectl, lista los contextos y cambia de contexto en caliente (Gestor, en gestor.go), y mantiene
+// watches (informers) de los objetos que necesita la foto (Conexion).
 //
 // kviz nunca se cae por no poder conectarse: sin contexto, o mientras el cluster no responde,
-// la conexión entrega una foto desconectada con el motivo.
+// el Gestor entrega una foto desconectada con el motivo y reintenta solo.
 //
 // Para observar un tipo de objeto nuevo: registrar su informer en Iniciar (con el handler de
 // avisos, para que sus cambios lleguen en vivo) y copiar sus objetos en Objetos (y sumarlos a
@@ -23,20 +24,17 @@ import (
 	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	listersnetworkingv1 "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"kviz/internal/foto"
 )
 
-// Conexion es la conexión a un cluster, con sus informers.
+// Conexion es la conexión a un cluster que responde, con sus informers. La arma el Gestor.
 type Conexion struct {
 	contexto string
-	// cliente es nil cuando no hay a qué conectarse; motivo dice por qué.
-	cliente kubernetes.Interface
-	motivo  string
+	cliente  kubernetes.Interface
 
 	sincronizada atomic.Bool
-	avisos       avisos
+	avisos       *avisos
 	nodos        listerscorev1.NodeLister
 	pods         listerscorev1.PodLister
 	deployments  listersappsv1.DeploymentLister
@@ -50,50 +48,18 @@ type Conexion struct {
 	ingress      listersnetworkingv1.IngressLister
 }
 
-// Nueva arma una conexión sobre un cliente ya creado. En producción el cliente sale de
-// DesdeKubeconfig; en los tests es el cliente falso de client-go.
-func Nueva(cliente kubernetes.Interface, contexto string) *Conexion {
-	return &Conexion{cliente: cliente, contexto: contexto}
+// nueva arma una conexión sobre un cliente ya creado; los cambios de sus objetos avisan a a.
+func nueva(cliente kubernetes.Interface, contexto string, a *avisos) *Conexion {
+	return &Conexion{cliente: cliente, contexto: contexto, avisos: a}
 }
 
-// DesdeKubeconfig arma la conexión al contexto actual de kubectl (KUBECONFIG o ~/.kube/config).
-// Si no hay contexto o el kubeconfig no sirve, la conexión queda desconectada con el motivo.
-func DesdeKubeconfig() *Conexion {
-	reglas := clientcmd.NewDefaultClientConfigLoadingRules()
-	cfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(reglas, &clientcmd.ConfigOverrides{})
-	crudo, err := cfg.RawConfig()
-	if err != nil {
-		return desconectada("", fmt.Sprintf("no se pudo leer el kubeconfig: %v", err))
-	}
-	ctx := crudo.CurrentContext
-	if ctx == "" {
-		return desconectada("", "kubectl no tiene un contexto actual: creá un cluster (kind create cluster) o elegí uno con kubectl config use-context")
-	}
-	rest, err := cfg.ClientConfig()
-	if err != nil {
-		return desconectada(ctx, fmt.Sprintf("el contexto %q no sirve: %v", ctx, err))
-	}
-	cliente, err := kubernetes.NewForConfig(rest)
-	if err != nil {
-		return desconectada(ctx, fmt.Sprintf("no se pudo crear el cliente para %q: %v", ctx, err))
-	}
-	return Nueva(cliente, ctx)
-}
-
-func desconectada(contexto, motivo string) *Conexion {
-	return &Conexion{contexto: contexto, motivo: motivo}
-}
-
-// Contexto es el nombre del contexto de kubectl de esta conexión ("" si no hay).
+// Contexto es el nombre del contexto de kubectl de esta conexión.
 func (c *Conexion) Contexto() string { return c.contexto }
 
 // Iniciar arranca los informers y espera a que sus cachés estén sincronizadas. Mientras el
 // cluster no responde, espera (los informers reintentan solos) hasta que se cancela ctx.
-// Sin cliente no hace nada. Los informers viven hasta que se cancela ctx.
+// Los informers viven hasta que se cancela ctx.
 func (c *Conexion) Iniciar(ctx context.Context) error {
-	if c.cliente == nil {
-		return nil
-	}
 	fabrica := informers.NewSharedInformerFactory(c.cliente, 0)
 	nodos := fabrica.Core().V1().Nodes()
 	pods := fabrica.Core().V1().Pods()
@@ -156,14 +122,10 @@ func (c *Conexion) Objetos() foto.Objetos {
 	return o
 }
 
-// Foto es la foto actual del cluster, o una foto desconectada con el motivo.
+// Foto es la foto actual del cluster, o una foto desconectada mientras se sincroniza.
 func (c *Conexion) Foto() foto.Foto {
-	switch {
-	case c.cliente == nil:
-		return foto.Desconectada(c.contexto, c.motivo)
-	case !c.sincronizada.Load():
-		return foto.Desconectada(c.contexto, fmt.Sprintf("conectando con el cluster del contexto %q…", c.contexto))
-	default:
-		return foto.Construir(c.contexto, c.Objetos())
+	if !c.sincronizada.Load() {
+		return foto.Desconectada(c.contexto, conectando(c.contexto))
 	}
+	return foto.Construir(c.contexto, c.Objetos())
 }

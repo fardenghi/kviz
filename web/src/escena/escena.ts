@@ -3,6 +3,7 @@
 import type { Foto, Ingress, Pod, Puerta, PuertoService, ReglaIngress, Service, Workload } from '../foto';
 import { indiceDeWorkloads, type MarcaDeWorkload, marcaDeWorkload, seleccionDeWorkload } from './workloads';
 import { type MarcasPod, marcasDePod } from './marcas-pod';
+import { aplicarFoco } from './foco';
 
 /** Estado de la interfaz que afecta la escena. Crece con foco, workload, recorrido y filtros. */
 export interface EstadoInterfaz {
@@ -21,6 +22,13 @@ export interface EstadoInterfaz {
   podsNuevos?: ReadonlySet<string>;
   /** id del workload seleccionado en la lista de workloads. No es foco: solo resalta sus pods. */
   workloadSeleccionado?: string | null;
+  /**
+   * id de escena del objeto apuntado con el mouse. Si es un Service, pod, Ingress o puerta, es el
+   * foco (manda sobre la selección) y además aclara los objetos no relacionados.
+   */
+  hover?: string | null;
+  /** id de escena del objeto seleccionado. Si es un Service, pod, Ingress o puerta, es el foco. */
+  seleccionado?: string | null;
 }
 
 export interface Caja {
@@ -28,6 +36,17 @@ export interface Caja {
   y: number;
   ancho: number;
   alto: number;
+}
+
+/** Cómo marca el foco a un objeto (ver foco.ts). */
+export interface MarcasDeFoco {
+  /**
+   * Borde azul (puertas: relleno sólido). Con hover, el foco y sus relacionados; con selección, el
+   * foco. Las puertas relacionadas se resaltan siempre.
+   */
+  resaltado: boolean;
+  /** 1, o aclarado si hay hover y no está relacionado con el foco (los pods además se atenúan por otras razones). */
+  opacidad: number;
 }
 
 export interface RegionEnEscena extends Caja {
@@ -38,7 +57,7 @@ export interface RegionEnEscena extends Caja {
   subtitulo: string;
 }
 
-export interface PodEnEscena extends Caja, MarcasPod {
+export interface PodEnEscena extends Caja, MarcasPod, MarcasDeFoco {
   /** `pod:<namespace>/<nombre>`: único en todo el cluster. */
   id: string;
   nombre: string;
@@ -54,11 +73,11 @@ export interface PodEnEscena extends Caja, MarcasPod {
   workload: MarcaDeWorkload;
   /** Con un workload seleccionado, el color del borde de sus pods; si no, null. */
   bordeWorkload: string | null;
-  /** 1, o atenuado cuando hay un workload seleccionado y el pod no es suyo, o si es Terminating. */
+  /** 1, o atenuado cuando hay un workload seleccionado y el pod no es suyo, si es Terminating o por el foco. */
   opacidad: number;
 }
 
-export interface ServiceEnEscena extends Caja {
+export interface ServiceEnEscena extends Caja, MarcasDeFoco {
   /** `service:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -69,7 +88,7 @@ export interface ServiceEnEscena extends Caja {
   puertos: string[];
 }
 
-export interface IngressEnEscena extends Caja {
+export interface IngressEnEscena extends Caja, MarcasDeFoco {
   /** `ingress:<namespace>/<nombre>`. */
   id: string;
   nombre: string;
@@ -81,7 +100,7 @@ export interface IngressEnEscena extends Caja {
 }
 
 /** Puerta: pestaña en el borde de arriba de un nodo, para un NodePort o un hostPort. */
-export interface PuertaEnEscena extends Caja {
+export interface PuertaEnEscena extends Caja, MarcasDeFoco {
   /** `puerta:<nodo>/<puerto>`, con `/<protocolo>` si no es TCP. */
   id: string;
   nodo: string;
@@ -97,8 +116,12 @@ export interface PuertaEnEscena extends Caja {
   destino: string;
 }
 
-/** Tono de una conexión. En reposo: `reposo`, o `no-listo` hacia un endpoint no listo. */
-export type TonoConexion = 'reposo' | 'no-listo';
+/**
+ * Tono de una conexión. En reposo: `reposo`, o `no-listo` hacia un endpoint no listo. Con foco:
+ * `foco` (azul, con flecha) entre relacionados y `fantasma` (casi invisible) el resto; con un
+ * workload seleccionado, `fantasma` las que no van a sus pods. Ver foco.ts.
+ */
+export type TonoConexion = 'reposo' | 'no-listo' | 'foco' | 'fantasma';
 
 export interface Punto {
   x: number;
@@ -112,6 +135,8 @@ export interface ConexionEnEscena {
   desde: string;
   hasta: string;
   tono: TonoConexion;
+  /** Línea de una puerta a su Service o pod: solo aparece con foco (ver foco.ts). */
+  dePuerta?: boolean;
   inicio: Punto;
   fin: Punto;
 }
@@ -126,6 +151,10 @@ export interface Escena {
   ingress: IngressEnEscena[];
   puertas: PuertaEnEscena[];
   conexiones: ConexionEnEscena[];
+  /** id del objeto con foco (hover o selección), o null. */
+  foco: string | null;
+  /** ids de los objetos relacionados con el foco, incluido el foco, ordenados; vacío sin foco. */
+  relacionados: string[];
 }
 
 export const MEDIDAS = {
@@ -259,6 +288,7 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
         ip: p.ip,
         region: g.id,
         nuevo: estado.podsNuevos?.has(idPod(p)) ?? false,
+        resaltado: false,
         ...terminando(p, seleccionDeWorkload(p, seleccionado)),
         workload: marcaDeWorkload(p, workloads),
         ...marcasDePod(p, tarjeta, anteriores.get(idPod(p))),
@@ -319,6 +349,8 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
       y: r.y - M.altoPuerta / 2 - Math.floor(i / porFila) * M.pasoFilaPuerta,
       ancho: M.anchoPuerta,
       alto: M.altoPuerta,
+      resaltado: false,
+      opacidad: 1,
     })),
   );
 
@@ -327,10 +359,14 @@ export function construirEscena(foto: Foto, estado: EstadoInterfaz = {}): Escena
     ...conexionesServicePod(foto.services, services, pods),
   ];
 
+  const delWorkload = seleccionado
+    ? new Set(visibles.filter((p) => p.workload === seleccionado.id).map(idPod))
+    : null;
+
   const cajas: Caja[] = [...regiones, ...ingress, ...services];
   const ancho = Math.max(0, ...cajas.map((c) => c.x + c.ancho));
   const alto = Math.max(0, ...cajas.map((c) => c.y + c.alto));
-  return { ancho, alto, regiones, pods, services, ingress, puertas, conexiones };
+  return aplicarFoco({ ancho, alto, regiones, pods, services, ingress, puertas, conexiones, foco: null, relacionados: [] }, estado, delWorkload);
 }
 
 const ordenPuertas = (a: Puerta, b: Puerta) =>
@@ -394,6 +430,8 @@ function ubicarIngress(visibles: Ingress[], services: ServiceEnEscena[], finEsce
       y: 0,
       ancho: M.anchoIngress,
       alto: M.altoIngress + (reglas.length - 1) * M.altoReglaIngress,
+      resaltado: false,
+      opacidad: 1,
     });
   };
 
@@ -488,6 +526,8 @@ function ubicarServices(visibles: Service[], pods: PodEnEscena[], finRegiones: n
       y: fila * (M.altoService + M.huecoFilas),
       ancho: M.anchoService,
       alto: M.altoService,
+      resaltado: false,
+      opacidad: 1,
     });
   };
 

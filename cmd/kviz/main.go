@@ -34,17 +34,13 @@ func main() {
 	ctx, parar := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer parar()
 
-	c := conexion.DesdeKubeconfig()
+	c := conexion.NuevoGestor(conexion.KubeconfigDeKubectl(), conexion.IntervaloDeVigilancia)
+	c.Iniciar(ctx)
 	if c.Contexto() == "" {
 		log.Print("sin contexto de kubectl: arranco desconectado")
 	} else {
 		log.Printf("conectando al contexto %s", c.Contexto())
 	}
-	go func() {
-		if err := c.Iniciar(ctx); err == nil && c.Contexto() != "" {
-			log.Printf("conectado a %s", c.Contexto())
-		}
-	}()
 
 	if !web.Compilada() {
 		log.Print("aviso: este binario no trae la interfaz; compilalo con `make build` desde kviz/")
