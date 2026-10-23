@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -24,6 +25,10 @@ type Foto struct {
 	Pods   []Pod  `json:"pods"`
 	// Services ordenados por namespace y nombre.
 	Services []Service `json:"services"`
+	// Ingress ordenados por namespace y nombre.
+	Ingress []Ingress `json:"ingress"`
+	// Puertas ordenadas por nodo, con las NodePort primero, y por puerto.
+	Puertas []Puerta `json:"puertas"`
 }
 
 type Nodo struct {
@@ -40,6 +45,8 @@ type Pod struct {
 	IP *string `json:"ip"`
 	// Fase es status.phase: Pending, Running, Succeeded, Failed o Unknown.
 	Fase string `json:"fase"`
+	// HostPorts son los puertos de sus containers que se abren en su nodo.
+	HostPorts []HostPort `json:"hostPorts"`
 }
 
 // Service es un Service con sus endpoints, tomados de sus EndpointSlices.
@@ -82,12 +89,13 @@ type Objetos struct {
 	Pods           []*corev1.Pod
 	Services       []*corev1.Service
 	EndpointSlices []*discoveryv1.EndpointSlice
+	Ingress        []*networkingv1.Ingress
 }
 
 // Construir traduce los objetos a la foto. Es pura y determinista: ordena nodos por nombre
 // y pods por namespace y nombre, así la misma entrada da siempre la misma foto.
 func Construir(contexto string, o Objetos) Foto {
-	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o)}
+	f := Foto{Contexto: contexto, Conectado: true, Nodos: []Nodo{}, Pods: []Pod{}, Services: services(o), Ingress: ingresses(o)}
 	for _, n := range o.Nodos {
 		f.Nodos = append(f.Nodos, Nodo{Nombre: n.Name, InternalIP: internalIP(n)})
 	}
@@ -100,6 +108,7 @@ func Construir(contexto string, o Objetos) Foto {
 			Nodo:      opcional(p.Spec.NodeName),
 			IP:        opcional(p.Status.PodIP),
 			Fase:      string(p.Status.Phase),
+			HostPorts: hostPorts(p),
 		})
 	}
 	sort.Slice(f.Pods, func(i, j int) bool {
@@ -109,12 +118,13 @@ func Construir(contexto string, o Objetos) Foto {
 		}
 		return a.Nombre < b.Nombre
 	})
+	f.Puertas = puertas(f.Nodos, f.Services, o)
 	return f
 }
 
 // Desconectada es la foto de cuando kviz no puede ver el cluster: sin objetos y con el motivo.
 func Desconectada(contexto, motivo string) Foto {
-	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}}
+	return Foto{Contexto: contexto, Conectado: false, Motivo: motivo, Nodos: []Nodo{}, Pods: []Pod{}, Services: []Service{}, Ingress: []Ingress{}, Puertas: []Puerta{}}
 }
 
 func services(o Objetos) []Service {

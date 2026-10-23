@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	listerscorev1 "k8s.io/client-go/listers/core/v1"
 	listersdiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
+	listersnetworkingv1 "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -36,6 +37,7 @@ type Conexion struct {
 	pods         listerscorev1.PodLister
 	services     listerscorev1.ServiceLister
 	slices       listersdiscoveryv1.EndpointSliceLister
+	ingress      listersnetworkingv1.IngressLister
 }
 
 // Nueva arma una conexión sobre un cliente ya creado. En producción el cliente sale de
@@ -91,10 +93,12 @@ func (c *Conexion) Iniciar(ctx context.Context) error {
 	slices := fabrica.Discovery().V1().EndpointSlices()
 	c.services = services.Lister()
 	c.slices = slices.Lister()
+	ingress := fabrica.Networking().V1().Ingresses()
+	c.ingress = ingress.Lister()
 
 	fabrica.Start(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), nodos.Informer().HasSynced, pods.Informer().HasSynced,
-		services.Informer().HasSynced, slices.Informer().HasSynced) {
+		services.Informer().HasSynced, slices.Informer().HasSynced, ingress.Informer().HasSynced) {
 		return fmt.Errorf("no se pudo sincronizar con el cluster %q", c.contexto)
 	}
 	c.sincronizada.Store(true)
@@ -108,7 +112,8 @@ func (c *Conexion) Objetos() foto.Objetos {
 	pods, _ := c.pods.List(labels.Everything())
 	services, _ := c.services.List(labels.Everything())
 	slices, _ := c.slices.List(labels.Everything())
-	return foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices}
+	ingress, _ := c.ingress.List(labels.Everything())
+	return foto.Objetos{Nodos: nodos, Pods: pods, Services: services, EndpointSlices: slices, Ingress: ingress}
 }
 
 // Foto es la foto actual del cluster, o una foto desconectada con el motivo.
