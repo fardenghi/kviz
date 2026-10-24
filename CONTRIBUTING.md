@@ -47,7 +47,7 @@ Tests go through three seams:
 ## Developing the UI
 
 ```sh
-go run ./cmd/kviz -no-abrir    # backend on :7777
+go run ./cmd/kviz -no-browser  # backend on :7777
 npm --prefix web run dev       # UI with hot reload; /api is proxied to the backend
 ```
 

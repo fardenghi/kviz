@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // `npm run dev` levanta la interfaz con recarga en caliente y le pasa /api al backend,
-// que tiene que estar corriendo aparte (`go run ./cmd/kviz -no-abrir`).
+// que tiene que estar corriendo aparte (`go run ./cmd/kviz -no-browser`).
 export default defineConfig({
   plugins: [react()],
   build: { outDir: 'dist', emptyOutDir: true },

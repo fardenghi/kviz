@@ -29,9 +29,14 @@ const puertoPorDefecto = 7777
 var version = "dev"
 
 func main() {
-	puerto := flag.Int("puerto", puertoPorDefecto, "puerto en 127.0.0.1; si está ocupado se usa otro libre")
-	noAbrir := flag.Bool("no-abrir", false, "no abrir el navegador al arrancar")
-	verVersion := flag.Bool("version", false, "imprimir la versión y salir")
+	// los flags van en inglés; los nombres en español quedan como alias para no romper a quien ya los usa
+	var puerto int
+	var noAbrir bool
+	flag.IntVar(&puerto, "port", puertoPorDefecto, "port to listen on, on 127.0.0.1; if it is taken, a free one is used")
+	flag.IntVar(&puerto, "puerto", puertoPorDefecto, "alias of -port")
+	flag.BoolVar(&noAbrir, "no-browser", false, "don't open the browser on start")
+	flag.BoolVar(&noAbrir, "no-abrir", false, "alias of -no-browser")
+	verVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	if *verVersion {
 		fmt.Printf("kviz %s\n", version)
@@ -56,7 +61,7 @@ func main() {
 		log.Print("aviso: este binario no trae la interfaz; compilalo con `make build` desde la raíz del código de kviz")
 	}
 
-	ln, err := escuchar(*puerto)
+	ln, err := escuchar(puerto)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -74,7 +79,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
-	if !*noAbrir {
+	if !noAbrir {
 		abrirNavegador(url)
 	}
 

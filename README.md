@@ -71,11 +71,13 @@ browser on it. If port 7777 is taken it picks a free port and prints it. Press `
 
 | Flag | Meaning |
 |---|---|
-| `-puerto N` | port to listen on, on `127.0.0.1` (default `7777`); if it is taken, a free one is used |
-| `-no-abrir` | don't open the browser on start |
+| `-port N` | port to listen on, on `127.0.0.1` (default `7777`); if it is taken, a free one is used |
+| `-no-browser` | don't open the browser on start |
 | `-version` | print the version and exit |
 
-As a kubectl plugin the flags are passed through unchanged: `kubectl kviz -puerto 8000`.
+The Spanish names `-puerto` and `-no-abrir` still work as aliases.
+
+As a kubectl plugin the flags are passed through unchanged: `kubectl kviz -port 8000`.
 
 You can switch to any other context of your kubeconfig from the top bar without restarting. kviz
 never modifies your kubeconfig. If the cluster goes away (for example after `kind delete cluster`)
