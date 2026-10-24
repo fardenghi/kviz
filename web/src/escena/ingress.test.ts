@@ -49,7 +49,7 @@ const nodePort = (nodo: string, puerto: number, service: string, namespace = 'de
   pod: null,
   haciaPuerto: 80,
 });
-const hostPort = (nodo: string, puerto: number, pod: string, namespace = 'ingress-nginx'): Puerta => ({
+const hostPort = (nodo: string, puerto: number, pod: string, namespace = 'ingress-nginx', ingressController = namespace === 'ingress-nginx'): Puerta => ({
   id: `${nodo}/${puerto}/TCP`,
   nodo,
   puerto,
@@ -59,6 +59,7 @@ const hostPort = (nodo: string, puerto: number, pod: string, namespace = 'ingres
   service: null,
   pod,
   haciaPuerto: puerto,
+  ingressController,
 });
 const foto = (parte: Partial<Foto>): Foto => ({
   contexto: 'kind-lab',
@@ -315,6 +316,20 @@ describe('puertas', () => {
     expect(construirEscena(f, { namespace: 'default' }).puertas.map((p) => p.texto)).toEqual([':30010', ':30010', ':30010']);
     const conSondeo = foto({ nodos: [nodo('lab-worker')], puertas: [hostPort('lab-worker', 9999, 'sondeo', 'kviz-system')] });
     expect(construirEscena(conSondeo, { mostrarSistema: true }).puertas).toEqual([]);
+  });
+
+  it('los hostPorts de otros pods del sistema (el apiserver con hostNetwork) se ocultan con su namespace', () => {
+    const f = foto({
+      nodos: [nodo('lab-control-plane'), nodo('lab-worker2')],
+      puertas: [
+        hostPort('lab-control-plane', 6443, 'kube-apiserver-lab-control-plane', 'kube-system'),
+        hostPort('lab-worker2', 80, 'ingress-nginx-controller-6b9f-lx2wp'),
+      ],
+    });
+    const textos = (estado = {}) => construirEscena(f, estado).puertas.map((p) => p.texto);
+
+    expect(textos()).toEqual([':80']);
+    expect(textos({ mostrarSistema: true })).toEqual([':6443', ':80']);
   });
 });
 

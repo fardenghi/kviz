@@ -8,6 +8,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -216,22 +217,35 @@ func probeHTTP(puerto intstr.IntOrString) *corev1.Probe {
 }
 
 func TestUnaProbeAUnPuertoQueElContainerNoExponeTieneAdvertencia(t *testing.T) {
-	// el caso del prototipo: liveness a :8000 con el container en :8080
-	p := podConLabels("default", "api-1", nil, puertoContainer(8080, "http"))
+	// el caso del prototipo: la liveness va a :8000 con el container en :8080 y está fallando
+	p := podBackend()
 	p.Spec.Containers[0].LivenessProbe = probeHTTP(intstr.FromInt32(8000))
+	// por nombre, un puerto que no existe hace fallar la probe siempre, aunque todavía no haya events
 	p.Spec.Containers[0].ReadinessProbe = &corev1.Probe{ProbeHandler: corev1.ProbeHandler{TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromString("metricas")}}}
-	kviz := nuevoKviz(t, "kind-lab", nodo("lab-worker", "172.23.0.4"), p)
+	falla := eventDeProbe(p, "application", "Unhealthy", "Liveness probe failed: Get \"http://10.244.1.7:8000/status\": connection refused", 3, arranque.Add(time.Minute))
+	kviz := nuevoKviz(t, "kind-lab", nodo("lab-worker", "172.23.0.4"), p, falla)
 
 	todas := kviz.advertencias(t)
 
-	liveness := conID(t, todas, "Pod/default/api-1/probe-puerto-no-expuesto/app/liveness")
-	contiene(t, "explicación", liveness.Explicacion, "liveness", "8000", "app", "8080")
-	contiene(t, "comando", liveness.Comando.Comando, "kubectl describe pod api-1 -n default --context kind-lab")
-	readiness := conID(t, todas, "Pod/default/api-1/probe-puerto-no-expuesto/app/readiness")
+	liveness := conID(t, todas, "Pod/default/backend/probe-puerto-no-expuesto/application/liveness")
+	contiene(t, "explicación", liveness.Explicacion, "liveness", "8000", "application", "8080")
+	contiene(t, "comando", liveness.Comando.Comando, "kubectl describe pod backend -n default --context kind-lab")
+	readiness := conID(t, todas, "Pod/default/backend/probe-puerto-no-expuesto/application/readiness")
 	contiene(t, "explicación", readiness.Explicacion, `"metricas"`)
 	if len(todas) != 2 {
 		t.Fatalf("advertencias = %s, want solo las dos de probes", mostrar(todas))
 	}
+}
+
+func TestUnaProbeQuePasaAUnPuertoNoDeclaradoNoTieneAdvertencia(t *testing.T) {
+	// el Ingress Controller de ingress-nginx: declara 80, 443 y 8443, y sus probes van al 10254
+	// (healthz). Kubernetes no exige declarar el puerto, así que mientras la probe pase no hay error.
+	p := podBackend()
+	p.Spec.Containers[0].LivenessProbe = probeHTTP(intstr.FromInt32(10254))
+	p.Spec.Containers[0].ReadinessProbe = probeHTTP(intstr.FromInt32(10254))
+	kviz := nuevoKviz(t, "kind-lab", nodo("lab-worker", "172.23.0.4"), p)
+
+	sinAdvertencias(t, kviz.advertencias(t), "probe-puerto-no-expuesto")
 }
 
 func TestUnaProbeAUnPuertoQueElContainerExponeNoTieneAdvertencia(t *testing.T) {

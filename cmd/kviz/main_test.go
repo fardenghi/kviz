@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -11,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 // compilar arma el binario de kviz con las ldflags dadas, como lo hace GoReleaser.
@@ -102,5 +106,28 @@ func TestFlagsEnInglesYAliasEnEspanol(t *testing.T) {
 				t.Fatalf("kviz no escuchó en %s a los 10 s", quiero)
 			}
 		})
+	}
+}
+
+// Los logs internos de client-go (klog) no salen por la terminal: al cortar el exec de una prueba
+// de conexión client-go se queja de la conexión cerrada, y eso no le dice nada a quien usa kviz.
+func TestLosLogsDeClientGoNoSalenPorLaTerminal(t *testing.T) {
+	lectura, escritura, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stderr := os.Stderr
+	os.Stderr = escritura
+	klog.SetOutput(escritura)
+	defer func() { os.Stderr = stderr }()
+
+	silenciarClientGo()
+	klog.ErrorS(errors.New("use of closed network connection"), "Copying stdout failed")
+	klog.Flush()
+	escritura.Close()
+
+	salida, _ := io.ReadAll(lectura)
+	if len(salida) != 0 {
+		t.Fatalf("klog escribió en la terminal: %q", salida)
 	}
 }

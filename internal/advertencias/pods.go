@@ -9,6 +9,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/fardenghi/kviz/internal/foto"
 )
 
 func (r *reglas) pods() {
@@ -16,11 +18,11 @@ func (r *reglas) pods() {
 		ob := objeto{"Pod", p.Namespace, p.Name}
 		r.sinRecursos(ob, p)
 		for _, c := range p.Spec.InitContainers {
-			r.probes(ob, c)
+			r.probes(ob, c, r.estadosDeProbes(p.Namespace+"/"+p.Name, c.Name))
 			r.imagen(ob, p, c, "initContainers", p.Status.InitContainerStatuses)
 		}
 		for _, c := range p.Spec.Containers {
-			r.probes(ob, c)
+			r.probes(ob, c, r.estadosDeProbes(p.Namespace+"/"+p.Name, c.Name))
 			r.imagen(ob, p, c, "containers", p.Status.ContainerStatuses)
 		}
 	}
@@ -140,14 +142,20 @@ func requests(p *corev1.Pod) string {
 // ---------- historia 72: probe a un puerto que el container no expone ----------
 
 // probes marca cada probe del container que apunta a un puerto que él no expone. Por nombre, el
-// puerto tiene que existir; por número, solo se puede juzgar si el container declara puertos.
-func (r *reglas) probes(ob objeto, c corev1.Container) {
+// puerto tiene que existir: si no, la probe falla siempre. Por número, Kubernetes no exige
+// declarar el puerto (la probe del Ingress Controller de ingress-nginx va al 10254 sin
+// declararlo), así que solo es un error si el container declara puertos, la probe no apunta a
+// ninguno de ellos y además está fallando.
+func (r *reglas) probes(ob objeto, c corev1.Container, estados map[string]string) {
 	for _, pr := range []struct {
 		tipo  string
 		probe *corev1.Probe
 	}{{"liveness", c.LivenessProbe}, {"readiness", c.ReadinessProbe}, {"startup", c.StartupProbe}} {
 		puerto, ok := puertoDeProbe(pr.probe)
 		if !ok || expone(c, puerto) {
+			continue
+		}
+		if puerto.Type == intstr.Int && estados[pr.tipo] != foto.ProbeFallando {
 			continue
 		}
 		cual := "el " + puerto.String()
@@ -167,6 +175,21 @@ func (r *reglas) probes(ob objeto, c corev1.Container) {
 			fmt.Sprintf("La %s probe del container %s apunta a %s, pero el container %s. La probe va a fallar: corregí el puerto de la probe o el containerPort.", pr.tipo, c.Name, cual, queExpone),
 			r.kubectl("Ver la probe, los puertos del container y los events Unhealthy", ob.namespace, "describe pod", ob.nombre))
 	}
+}
+
+// estadosDeProbes es el estado de cada probe (liveness, readiness, startup) del container en la foto.
+func (r *reglas) estadosDeProbes(podID, container string) map[string]string {
+	estados := map[string]string{}
+	if p := r.f.PodPorID(podID); p != nil {
+		for _, c := range p.Containers {
+			if c.Nombre == container {
+				for _, pr := range c.Probes {
+					estados[pr.Nombre] = pr.Estado
+				}
+			}
+		}
+	}
+	return estados
 }
 
 // puertoDeProbe es el puerto al que apunta la probe; ok es false si no usa uno (exec) o no hay probe.

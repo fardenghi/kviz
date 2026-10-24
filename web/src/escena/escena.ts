@@ -433,14 +433,16 @@ const ordenPuertas = (a: Puerta, b: Puerta) =>
   (a.protocolo < b.protocolo ? -1 : a.protocolo > b.protocolo ? 1 : 0);
 
 /**
- * Una puerta NodePort se ve si se ve su Service. Una de hostPort es del nodo: se ve aunque los
- * namespaces del sistema estén ocultos (el hostPort del Ingress Controller es la entrada al
- * cluster), pero respeta el filtro por namespace. Las de kviz-system no se ven nunca.
+ * Una puerta NodePort se ve si se ve su Service. Una de hostPort sigue a su namespace, salvo la del
+ * Ingress Controller: es la entrada al cluster, así que se ve aunque los namespaces del sistema
+ * estén ocultos (pero respeta el filtro por namespace). Las de kviz-system no se ven nunca.
  */
 function seVePuerta(p: Puerta, estado: EstadoInterfaz, delRecorrido: Set<string>): boolean {
   if (p.tipo === 'NodePort') return seVe(p.namespace, estado);
   if (p.namespace === NAMESPACE_DE_KVIZ) return false;
-  return !estado.namespace || p.namespace === estado.namespace || delRecorrido.has(idPod({ namespace: p.namespace, nombre: p.pod! }));
+  if (delRecorrido.has(idPod({ namespace: p.namespace, nombre: p.pod! }))) return true;
+  if (!p.ingressController) return seVe(p.namespace, estado);
+  return !estado.namespace || p.namespace === estado.namespace;
 }
 
 /** Services de la escena a los que manda un Ingress (los de sus reglas, en su namespace), sin repetir. */

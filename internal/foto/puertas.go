@@ -3,6 +3,7 @@ package foto
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -34,6 +35,33 @@ type Puerta struct {
 	Pod *string `json:"pod"`
 	// HaciaPuerto es el puerto del Service (NodePort) o del container (hostPort) al que llega.
 	HaciaPuerto int32 `json:"haciaPuerto"`
+	// IngressController marca un hostPort del Ingress Controller: la entrada al cluster, que la
+	// vista muestra aunque los namespaces del sistema estén ocultos. Los demás hostPorts del
+	// sistema (por ejemplo los de los pods estáticos con hostNetwork) se ocultan con su namespace.
+	IngressController bool `json:"ingressController"`
+}
+
+// esIngressController reconoce el pod de ingress-nginx por sus etiquetas o por la imagen de alguno
+// de sus containers.
+func esIngressController(labels map[string]string, imagenes []string) bool {
+	if labels["app.kubernetes.io/name"] == "ingress-nginx" && labels["app.kubernetes.io/component"] == "controller" {
+		return true
+	}
+	for _, i := range imagenes {
+		if strings.Contains(i, "ingress-nginx/controller") {
+			return true
+		}
+	}
+	return false
+}
+
+// EsIngressController dice si el pod es el Ingress Controller (ingress-nginx).
+func (p Pod) EsIngressController() bool {
+	imagenes := make([]string, 0, len(p.Containers))
+	for _, c := range p.Containers {
+		imagenes = append(imagenes, c.Imagen)
+	}
+	return esIngressController(p.Labels, imagenes)
 }
 
 const (
@@ -81,9 +109,14 @@ func puertas(nodos []Nodo, services []Service, o Objetos) []Puerta {
 		if p.Spec.NodeName == "" || p.Status.Phase == corev1.PodSucceeded || p.Status.Phase == corev1.PodFailed {
 			continue
 		}
+		imagenes := []string{}
+		for _, c := range append(append([]corev1.Container{}, p.Spec.InitContainers...), p.Spec.Containers...) {
+			imagenes = append(imagenes, c.Image)
+		}
+		ic := esIngressController(p.Labels, imagenes)
 		for _, hp := range hostPorts(p) {
 			out = append(out, Puerta{Nodo: p.Spec.NodeName, Puerto: hp.Puerto, Protocolo: hp.Protocolo, Tipo: PuertaHostPort,
-				Namespace: p.Namespace, Pod: opcional(p.Name), HaciaPuerto: hp.ContainerPort})
+				Namespace: p.Namespace, Pod: opcional(p.Name), HaciaPuerto: hp.ContainerPort, IngressController: ic})
 		}
 	}
 	for i := range out {

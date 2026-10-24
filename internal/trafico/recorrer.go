@@ -137,7 +137,7 @@ func (c *calculo) desdeNodo(n *foto.Nodo, puerto int32) {
 		c.con(paso)
 		return
 	}
-	if c.http && esIngressController(p) {
+	if c.http && p.EsIngressController() {
 		paso.Detalle = "Entra al Ingress Controller " + p.Nombre
 		c.con(paso)
 		c.desdeIngressController([]*foto.Pod{p})
@@ -217,7 +217,7 @@ func (c *calculo) desdeService(s *foto.Service, puerto intstr.IntOrString, ics [
 	// el Service del Ingress Controller: la request sigue por una regla de Ingress
 	if c.http && ics == nil && len(listos) > 0 && len(listos) == len(direcciones) {
 		for _, l := range listos {
-			if !esIngressController(l) {
+			if !l.EsIngressController() {
 				return
 			}
 		}
@@ -247,19 +247,6 @@ func puertaDe(f foto.Foto, nodo string, puerto int32) *foto.Puerta {
 		}
 	}
 	return nil
-}
-
-// esIngressController reconoce el pod de ingress-nginx por sus etiquetas o por su imagen.
-func esIngressController(p *foto.Pod) bool {
-	if p.Labels["app.kubernetes.io/name"] == "ingress-nginx" && p.Labels["app.kubernetes.io/component"] == "controller" {
-		return true
-	}
-	for _, c := range p.Containers {
-		if strings.Contains(c.Imagen, "ingress-nginx/controller") {
-			return true
-		}
-	}
-	return false
 }
 
 func refNodo(nombre string) Ref      { return Ref{Tipo: RefNodo, ID: nombre} }

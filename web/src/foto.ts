@@ -428,4 +428,6 @@ export interface Puerta {
   pod: string | null;
   /** Puerto del Service (NodePort) o del container (hostPort) al que llega. */
   haciaPuerto: number;
+  /** Es un hostPort del Ingress Controller: la entrada al cluster, visible aunque su namespace esté oculto. */
+  ingressController?: boolean;
 }

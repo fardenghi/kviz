@@ -17,6 +17,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
+	"k8s.io/klog/v2"
+
 	"github.com/fardenghi/kviz/internal/api"
 	"github.com/fardenghi/kviz/internal/conexion"
 	"github.com/fardenghi/kviz/internal/sondeo"
@@ -29,6 +32,7 @@ const puertoPorDefecto = 7777
 var version = "dev"
 
 func main() {
+	silenciarClientGo()
 	// los flags van en inglés; los nombres en español quedan como alias para no romper a quien ya los usa
 	var puerto int
 	var noAbrir bool
@@ -93,6 +97,14 @@ func main() {
 	if err := c.Cerrar(borrar); err != nil {
 		log.Printf("no pude borrar el pod de sondeo (%v); se limpia la próxima vez que arranque kviz", err)
 	}
+}
+
+// silenciarClientGo descarta los logs internos de client-go (klog). Son para quien desarrolla
+// client-go, no para quien usa kviz: por ejemplo, al cortar el exec de una prueba de conexión apenas
+// curl conecta, client-go se queja de la conexión cerrada aunque la prueba salió bien. Los errores
+// que importan kviz los muestra en la interfaz.
+func silenciarClientGo() {
+	klog.SetLogger(logr.Discard())
 }
 
 // escuchar abre el puerto pedido en 127.0.0.1 (nunca en otras interfaces). Si está ocupado,

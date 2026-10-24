@@ -44,6 +44,7 @@ const nodePort = (nodo: string, puerto: number, service: string): Puerta => ({
   haciaPuerto: 80,
 });
 const hostPort = (nodo: string, puerto: number, pod: string): Puerta => ({
+  ingressController: true,
   id: `${nodo}/${puerto}/TCP`,
   nodo,
   puerto,

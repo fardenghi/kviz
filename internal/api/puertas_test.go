@@ -26,6 +26,8 @@ type puertaEnFoto struct {
 	Service     *string `json:"service"`
 	Pod         *string `json:"pod"`
 	HaciaPuerto int32   `json:"haciaPuerto"`
+	// IngressController marca las puertas de hostPort del Ingress Controller.
+	IngressController bool `json:"ingressController"`
 }
 
 type fotoConPuertas struct {
@@ -101,7 +103,7 @@ func TestUnHostPortAbreUnaSolaPuertaEnElNodoDeSuPod(t *testing.T) {
 	}
 	puerta := func(puerto int32) puertaEnFoto {
 		return puertaEnFoto{ID: "lab-worker2/" + itoa(puerto) + "/TCP", Nodo: "lab-worker2", Puerto: puerto, Protocolo: "TCP", Tipo: "hostPort", Namespace: "ingress-nginx",
-			Pod: ptr("ingress-nginx-controller-6b9f-lx2wp"), HaciaPuerto: puerto}
+			Pod: ptr("ingress-nginx-controller-6b9f-lx2wp"), HaciaPuerto: puerto, IngressController: true}
 	}
 	// por id: el orden es el del texto, no el numérico (la escena las ordena para dibujarlas)
 	want := []puertaEnFoto{puerta(443), puerta(80)}
@@ -186,3 +188,23 @@ func TestSinNodePortsNiHostPortsLaFotoTraeUnaListaVaciaDePuertas(t *testing.T) {
 }
 
 func itoa(n int32) string { return mostrar(n) }
+
+func TestElHostPortDeUnPodDelSistemaNoEsDelIngressController(t *testing.T) {
+	// el apiserver de kind es un pod estático con hostNetwork: Kubernetes le completa hostPort 6443
+	apiserver := pod("kube-system", "kube-apiserver-lab-control-plane", "lab-control-plane", "172.23.0.2", corev1.PodRunning)
+	apiserver.Spec.Containers = []corev1.Container{{Name: "kube-apiserver", Image: "registry.k8s.io/kube-apiserver:v1.33.1",
+		Ports: []corev1.ContainerPort{{ContainerPort: 6443, HostPort: 6443, Protocol: corev1.ProtocolTCP}}}}
+	kviz := nuevoKviz(t, "kind-lab", append(clusterDeLaGuia(), apiserver)...)
+
+	porID := map[string]puertaEnFoto{}
+	for _, p := range kviz.fotoConPuertas(t).Puertas {
+		porID[p.ID] = p
+	}
+
+	if p := porID["lab-control-plane/6443/TCP"]; p.Tipo != "hostPort" || p.IngressController {
+		t.Errorf("puerta del apiserver = %s, want hostPort que no es del Ingress Controller", mostrar(p))
+	}
+	if p := porID["lab-worker2/80/TCP"]; !p.IngressController {
+		t.Errorf("puerta :80 de lab-worker2 = %s, want del Ingress Controller", mostrar(p))
+	}
+}
